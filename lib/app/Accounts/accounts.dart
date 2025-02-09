@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:managermoney/components/BottomNavBar.dart';
+import 'package:managermoney/components/Widgets%20Accounts/accountSummary.dart';
 import 'package:managermoney/components/Widgets%20Accounts/account_list.dart';
 import 'package:managermoney/components/crud.dart';
 import 'package:managermoney/connstants/linkApi.dart';
@@ -66,13 +67,11 @@ class _AccountsState extends State<Accounts> {
         children: [
           Divider(),
           Padding(
-            padding: const EdgeInsets.all(5.0),
+            padding: const EdgeInsets.all(8.0),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildSummaryItem('Assets', '10,000', Colors.blue),
-                _buildSummaryItem('Liabilities', '0,000', Colors.red),
-                _buildSummaryItem('Total', '0,000', Colors.black),
+                AccountSummary()
               ],
             ),
           ),
