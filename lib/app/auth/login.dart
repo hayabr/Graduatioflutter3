@@ -3,8 +3,10 @@ import 'package:managermoney/components/crud.dart';
 import 'package:managermoney/components/customtextform.dart';
 import 'package:managermoney/components/valid.dart';
 import 'package:managermoney/connstants/linkApi.dart';
-import 'package:awesome_dialog/awesome_dialog.dart';//pub
-import 'package:managermoney/main.dart'; // ✅ Ensure you have this package installed
+import 'package:awesome_dialog/awesome_dialog.dart'; //pub
+import 'package:get/get.dart'; // استيراد GetX
+import 'package:managermoney/controller/user_controller.dart';
+ // استيراد UserController
 
 class Login extends StatefulWidget {
   const Login({super.key});
@@ -19,6 +21,7 @@ class _LoginState extends State<Login> {
   final TextEditingController password = TextEditingController();
 
   Crud crud = Crud(); // ✅ Removed unnecessary `new` keyword
+  final UserController userController = Get.put(UserController()); // استخدام GetX Controller
 
   login() async {
     if (formstate.currentState!.validate()) {
@@ -28,9 +31,11 @@ class _LoginState extends State<Login> {
       });
 
       if (response['status'] == "success") {
-      
+        // تخزين الـ id باستخدام GetX
+        userController.setUserId(response['data']['id'].toString());
+        print('User ID saved in GetX: ${userController.userId.value}');
+        
         Navigator.of(context).pushNamed("home");
-
       } else {
         AwesomeDialog(
           context: context,
