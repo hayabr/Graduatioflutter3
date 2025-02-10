@@ -18,8 +18,7 @@ class _AddAccountState extends State<AddAccount> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
-  String _selectedGroup = 'Savings';
-  String _selectedClassification = 'Assets';
+  String _selectedGroup = 'Savings'; // Default group value
 
   Future<void> _addAccount() async {
     if (_formKey.currentState!.validate()) {
@@ -31,14 +30,13 @@ class _AddAccountState extends State<AddAccount> {
           "name": _nameController.text,
           "amount": _amountController.text,
           "description": _descriptionController.text,
-          "classification": _selectedClassification,
         });
 
         print("Raw Response: $response");
 
         if (response != null && response['status'] == "success") {
           Get.snackbar("Success", "Account added successfully");
-          Get.offAll(Accounts()); // الانتقال إلى صفحة AccountsList بعد الإضافة
+          Get.offAll(Accounts()); // Navigate to Accounts page after adding
         } else {
           Get.snackbar("Error", "Failed to add account");
         }
@@ -55,78 +53,101 @@ class _AddAccountState extends State<AddAccount> {
       appBar: AppBar(
         title: Text("Add Account"),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            children: [
-              TextFormField(
-                controller: _nameController,
-                decoration: InputDecoration(labelText: 'Account Name'),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter the account name';
-                  }
-                  return null;
-                },
-              ),
-              TextFormField(
-                controller: _amountController,
-                decoration: InputDecoration(labelText: 'Amount'),
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter the amount';
-                  }
-                  return null;
-                },
-              ),
-              TextFormField(
-                controller: _descriptionController,
-                decoration: InputDecoration(labelText: 'Description'),
-              ),
-              DropdownButtonFormField<String>(
-                value: _selectedGroup,
-                decoration: InputDecoration(labelText: 'Group'),
-                items: <String>['Savings', 'Investments', 'Expenses']
-                    .map<DropdownMenuItem<String>>((String value) {
-                  return DropdownMenuItem<String>(
-                    value: value,
-                    child: Text(value),
-                  );
-                }).toList(),
-                onChanged: (String? newValue) {
-                  setState(() {
-                    _selectedGroup = newValue!;
-                  });
-                },
-              ),
-              DropdownButtonFormField<String>(
-                value: _selectedClassification,
-                decoration: InputDecoration(labelText: 'Classification'),
-                items: <String>['Assets', 'Liabilities']
-                    .map<DropdownMenuItem<String>>((String value) {
-                  return DropdownMenuItem<String>(
-                    value: value,
-                    child: Text(value),
-                  );
-                }).toList(),
-                onChanged: (String? newValue) {
-                  setState(() {
-                    _selectedClassification = newValue!;
-                  });
-                },
-              ),
-              SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: _addAccount,
-                child: Text("Save"),
-              ),
-            ],
+      body: Directionality(
+        textDirection: TextDirection.ltr, // Set text direction to LTR
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                DropdownButtonFormField<String>(
+                  value: _selectedGroup,
+                  decoration: InputDecoration(
+                    labelText: 'Group',
+                    labelStyle: TextStyle(color: Colors.red, fontSize: 16, fontWeight: FontWeight.bold),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  items: <String>[
+                    'Savings',
+                    'Investments',
+                    'Cash',
+                    'Card',
+                    'Debit Card',
+                    'Overdrafts',
+                    'Insurance',
+                    'Loan',
+                    'Others',
+                  ].map<DropdownMenuItem<String>>((String value) {
+                    return DropdownMenuItem<String>(
+                      value: value,
+                      child: Text(value),
+                    );
+                  }).toList(),
+                  onChanged: (String? newValue) {
+                    setState(() {
+                      _selectedGroup = newValue!;
+                    });
+                  },
+                ),
+                SizedBox(height: 10),
+                TextFormField(
+                  controller: _nameController,
+                  decoration: InputDecoration(
+                    labelText: 'Account Name',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter the account name';
+                    }
+                    return null;
+                  },
+                ),
+                SizedBox(height: 10),
+                TextFormField(
+                  controller: _amountController,
+                  decoration: InputDecoration(
+                    labelText: 'Amount',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter the amount';
+                    }
+                    return null;
+                  },
+                ),
+                SizedBox(height: 10),
+                TextFormField(
+                  controller: _descriptionController,
+                  decoration: InputDecoration(
+                    labelText: 'Description',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  maxLines: 4, // Make the description field larger
+                ),
+                SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _addAccount,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red, // Change button color to red
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      padding: EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: Text("Save", style: TextStyle(fontSize: 18, color: Colors.white)),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 }
+

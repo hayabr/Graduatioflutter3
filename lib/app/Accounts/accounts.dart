@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:managermoney/components/BottomNavBar.dart';
-import 'package:managermoney/components/Widgets%20Accounts/accountSummary.dart';
-import 'package:managermoney/components/Widgets%20Accounts/account_list.dart';
-import 'package:managermoney/components/crud.dart';
+import 'package:managermoney/app/Accounts/addAccounts.dart';
 import 'package:managermoney/connstants/linkApi.dart';
 import 'package:managermoney/controller/user_controller.dart';
 import 'package:get/get.dart';
- // استيراد الودجت الجديدة
+import 'package:managermoney/widgets/BottomNavBar.dart';
+import 'package:managermoney/widgets/Widgets%20Accounts/accountSummary.dart';
+import 'package:managermoney/widgets/Widgets%20Accounts/account_list.dart';
 
 class Accounts extends StatefulWidget {
+  const Accounts({super.key});
+
   @override
   _AccountsState createState() => _AccountsState();
 }
@@ -16,6 +17,7 @@ class Accounts extends StatefulWidget {
 class _AccountsState extends State<Accounts> {
   int _selectedIndex = 2;
 
+  // تغيير الاختيار في شريط التنقل السفلي
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
@@ -25,9 +27,9 @@ class _AccountsState extends State<Accounts> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white, 
+      backgroundColor: Colors.white,
       appBar: AppBar(
-         backgroundColor: Colors.white, 
+        backgroundColor: Colors.white,
         leading: SizedBox.shrink(),
         flexibleSpace: Align(
           alignment: Alignment.centerLeft,
@@ -46,7 +48,19 @@ class _AccountsState extends State<Accounts> {
                     data: IconThemeData(color: Colors.black.withOpacity(0.7)),
                     child: PopupMenuButton<String>(
                       onSelected: (value) {
-                        print("تم اختيار: $value");
+                        if (value == "Add") {
+                          // الانتقال إلى صفحة إضافة حساب
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => AddAccount(),
+                            ),
+                          );
+                        } else if (value == "Delete") {
+                          print("Delete selected");
+                        } else if (value == "Modify Account") {
+                          print("Modify Account selected");
+                        }
                       },
                       itemBuilder: (BuildContext context) => [
                         PopupMenuItem(value: "Add", child: Text("Add", style: TextStyle(fontSize: 18))),
@@ -71,13 +85,13 @@ class _AccountsState extends State<Accounts> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                AccountSummary()
+                AccountSummary()  // استدعاء حسابات المستخدم
               ],
             ),
           ),
           Divider(),
           Expanded(
-            child: AccountsList(), // استدعاء الودجت الجديدة هنا
+            child: AccountsList(), // عرض قائمة الحسابات
           ),
         ],
       ),
@@ -88,6 +102,7 @@ class _AccountsState extends State<Accounts> {
     );
   }
 
+  // دالة لإظهار تفاصيل الحسابات (مثال)
   Widget _buildSummaryItem(String title, String value, Color color) {
     return Column(
       children: [
