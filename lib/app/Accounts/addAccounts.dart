@@ -18,7 +18,8 @@ class _AddAccountState extends State<AddAccount> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
-  String _selectedGroup = 'Cash'; // القيمة الافتراضية للمجموعة
+  String _selectedGroup = 'Savings';
+  String _selectedClassification = 'Assets';
 
   Future<void> _addAccount() async {
     if (_formKey.currentState!.validate()) {
@@ -30,13 +31,14 @@ class _AddAccountState extends State<AddAccount> {
           "name": _nameController.text,
           "amount": _amountController.text,
           "description": _descriptionController.text,
+          "classification": _selectedClassification,
         });
 
         print("Raw Response: $response");
 
         if (response != null && response['status'] == "success") {
           Get.snackbar("Success", "Account added successfully");
-          Get.offAll(Accounts()); // الانتقال إلى صفحة Accounts بعد الإضافة
+          Get.offAll(Accounts()); // الانتقال إلى صفحة AccountsList بعد الإضافة
         } else {
           Get.snackbar("Error", "Failed to add account");
         }
@@ -87,17 +89,8 @@ class _AddAccountState extends State<AddAccount> {
               DropdownButtonFormField<String>(
                 value: _selectedGroup,
                 decoration: InputDecoration(labelText: 'Group'),
-                items: <String>[
-                  'Cash',
-                  'Card',
-                  'Debit Card',
-                  'Savings',
-                  'Investments',
-                  'Overdrafts',
-                  'Insurance',
-                  'Loan',
-                  'Others',
-                ].map<DropdownMenuItem<String>>((String value) {
+                items: <String>['Savings', 'Investments', 'Expenses']
+                    .map<DropdownMenuItem<String>>((String value) {
                   return DropdownMenuItem<String>(
                     value: value,
                     child: Text(value),
@@ -106,6 +99,22 @@ class _AddAccountState extends State<AddAccount> {
                 onChanged: (String? newValue) {
                   setState(() {
                     _selectedGroup = newValue!;
+                  });
+                },
+              ),
+              DropdownButtonFormField<String>(
+                value: _selectedClassification,
+                decoration: InputDecoration(labelText: 'Classification'),
+                items: <String>['Assets', 'Liabilities']
+                    .map<DropdownMenuItem<String>>((String value) {
+                  return DropdownMenuItem<String>(
+                    value: value,
+                    child: Text(value),
+                  );
+                }).toList(),
+                onChanged: (String? newValue) {
+                  setState(() {
+                    _selectedClassification = newValue!;
                   });
                 },
               ),
