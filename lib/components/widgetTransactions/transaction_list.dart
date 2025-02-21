@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:managermoney/app/Transaction/editTransation.dart';
 import 'package:managermoney/connstants/linkApi.dart';
 import 'package:managermoney/controller/user_controller.dart';
 import 'package:get/get.dart';
@@ -67,11 +68,14 @@ class TransactionCard extends StatelessWidget {
   }
 
   // دالة عند الضغط على المعاملة
-  void _onTransactionTap(Map<String, dynamic> transaction) {
-    // يمكنك استبدال هذا بالإجراء الذي تريده، مثل فتح صفحة التعديل أو الحذف
-    print("Transaction tapped: ${transaction['id']}");
-    // مثال: فتح صفحة التعديل
-    // Get.to(() => EditTransactionPage(transaction: transaction));
+  void _onTransactionTap(BuildContext context, Map<String, dynamic> transaction) {
+    // استخدام Navigator.push للانتقال إلى صفحة التعديل
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => UpdateTransaction(transaction: transaction),
+      ),
+    );
   }
 
   @override
@@ -127,7 +131,7 @@ class TransactionCard extends StatelessWidget {
                           ...transactionsForDate.map((transaction) {
                             Color amountColor = transaction['type'] == "income" ? Colors.green : Colors.red;
                             return InkWell(
-                              onTap: () => _onTransactionTap(transaction),
+                              onTap: () => _onTransactionTap(context, transaction),
                               borderRadius: BorderRadius.circular(12),
                               splashColor: Colors.blue.withOpacity(0.1),
                               highlightColor: Colors.blue.withOpacity(0.05),
