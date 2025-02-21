@@ -132,11 +132,55 @@ class _UpdateTransactionState extends State<UpdateTransaction> {
     }
   }
 
+  Future<void> _deleteTransaction() async {
+    bool confirmDelete = await Get.dialog(
+      AlertDialog(
+        title: Text("Confirm Delete"),
+        content: Text("Are you sure you want to delete this transaction?"),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(result: false),
+            child: Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () => Get.back(result: true),
+            child: Text("Delete"),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmDelete) {
+      try {
+        String userId = userController.getUserId();
+        var response = await crud.postRequest(linkDeleteTransaction, {
+          "transaction_id": widget.transaction['id'],
+          "user_id": userId,
+        });
+
+        if (response != null && response['status'] == "success") {
+          Get.snackbar("Success", "Transaction deleted successfully");
+          Get.offAll(Home());
+        } else {
+          Get.snackbar("Error", "Failed to delete transaction");
+        }
+      } catch (e) {
+        Get.snackbar("Error", "An error occurred while deleting the transaction");
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text("Transaction Info"),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.delete), // أيقونة الحذف
+            onPressed: _deleteTransaction, // دالة الحذف
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -149,13 +193,13 @@ class _UpdateTransactionState extends State<UpdateTransaction> {
                 value: _selectedAccount.isNotEmpty ? _selectedAccount : null,
                 decoration: InputDecoration(
                   labelText: 'Account',
-                  labelStyle: TextStyle(fontSize: 16), // زيادة حجم الخط
+                  labelStyle: TextStyle(fontSize: 16),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                 ),
                 items: userAccounts.map<DropdownMenuItem<String>>((account) {
                   return DropdownMenuItem<String>(
                     value: account['id'].toString(),
-                    child: Text(account['name'], style: TextStyle(fontSize: 16)), // زيادة حجم الخط
+                    child: Text(account['name'], style: TextStyle(fontSize: 16)),
                   );
                 }).toList(),
                 onChanged: (String? newValue) {
@@ -169,10 +213,10 @@ class _UpdateTransactionState extends State<UpdateTransaction> {
                 controller: _amountController,
                 decoration: InputDecoration(
                   labelText: 'Amount',
-                  labelStyle: TextStyle(fontSize: 16), // زيادة حجم الخط
+                  labelStyle: TextStyle(fontSize: 16),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                style: TextStyle(fontSize: 16), // زيادة حجم الخط
+                style: TextStyle(fontSize: 16),
                 keyboardType: TextInputType.number,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -186,7 +230,7 @@ class _UpdateTransactionState extends State<UpdateTransaction> {
                 value: _selectedType,
                 decoration: InputDecoration(
                   labelText: 'Transaction Type',
-                  labelStyle: TextStyle(fontSize: 16), // زيادة حجم الخط
+                  labelStyle: TextStyle(fontSize: 16),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                 ),
                 items: [
@@ -206,7 +250,7 @@ class _UpdateTransactionState extends State<UpdateTransaction> {
                 value: _selectedCategory.isNotEmpty ? _selectedCategory : null,
                 decoration: InputDecoration(
                   labelText: 'Category',
-                  labelStyle: TextStyle(fontSize: 16), // زيادة حجم الخط
+                  labelStyle: TextStyle(fontSize: 16),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                   suffixIcon: Icon(Icons.category),
                 ),
@@ -214,7 +258,7 @@ class _UpdateTransactionState extends State<UpdateTransaction> {
                     .map<DropdownMenuItem<String>>((category) {
                   return DropdownMenuItem<String>(
                     value: category['id'].toString(),
-                    child: Text(category['name'], style: TextStyle(fontSize: 16)), // زيادة حجم الخط
+                    child: Text(category['name'], style: TextStyle(fontSize: 16)),
                   );
                 }).toList(),
                 onChanged: (String? newValue) {
@@ -229,11 +273,11 @@ class _UpdateTransactionState extends State<UpdateTransaction> {
                 readOnly: true,
                 decoration: InputDecoration(
                   labelText: 'Transaction Date',
-                  labelStyle: TextStyle(fontSize: 16), // زيادة حجم الخط
+                  labelStyle: TextStyle(fontSize: 16),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                   suffixIcon: Icon(Icons.calendar_today),
                 ),
-                style: TextStyle(fontSize: 16), // زيادة حجم الخط
+                style: TextStyle(fontSize: 16),
                 onTap: () => _selectDate(context),
               ),
               SizedBox(height: 10),
@@ -241,10 +285,10 @@ class _UpdateTransactionState extends State<UpdateTransaction> {
                 controller: _noteController,
                 decoration: InputDecoration(
                   labelText: 'Note',
-                  labelStyle: TextStyle(fontSize: 16), // زيادة حجم الخط
+                  labelStyle: TextStyle(fontSize: 16),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                style: TextStyle(fontSize: 16), // زيادة حجم الخط
+                style: TextStyle(fontSize: 16),
                 maxLines: 3,
               ),
               SizedBox(height: 20),
