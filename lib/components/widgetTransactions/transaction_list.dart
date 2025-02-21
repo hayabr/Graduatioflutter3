@@ -26,8 +26,8 @@ class TransactionCard extends StatelessWidget {
 
         // فرز المعاملات بناءً على التاريخ (الأحدث أولاً)
         transactions.sort((a, b) {
-          var dateA = DateTime.parse(a['transaction_date']);
-          var dateB = DateTime.parse(b['transaction_date']);
+          var dateA = DateTime.parse(a['transaction_date'] ?? '1970-01-01');
+          var dateB = DateTime.parse(b['transaction_date'] ?? '1970-01-01');
           return dateB.compareTo(dateA); // ترتيب تنازلي (الأحدث أولاً)
         });
 
@@ -47,7 +47,7 @@ class TransactionCard extends StatelessWidget {
     Map<String, List<dynamic>> groupedTransactions = {};
 
     for (var transaction in transactions) {
-      String date = transaction['transaction_date'];
+      String date = transaction['transaction_date'] ?? 'Unknown Date'; // استخدام قيمة افتراضية إذا كانت null
       if (!groupedTransactions.containsKey(date)) {
         groupedTransactions[date] = [];
       }
@@ -91,10 +91,10 @@ class TransactionCard extends StatelessWidget {
           // تجميع المعاملات بناءً على التاريخ
           var groupedTransactions = groupTransactionsByDate(transactions);
 
-          return SingleChildScrollView(  // إضافة SingleChildScrollView للتأكد من التمرير
+          return SingleChildScrollView(
             child: ListView.builder(
               shrinkWrap: true,
-              physics: ClampingScrollPhysics(),  // تحسين التمرير
+              physics: ClampingScrollPhysics(),
               itemCount: groupedTransactions.length,
               itemBuilder: (context, index) {
                 var date = groupedTransactions.keys.elementAt(index);
@@ -127,18 +127,18 @@ class TransactionCard extends StatelessWidget {
                           ...transactionsForDate.map((transaction) {
                             Color amountColor = transaction['type'] == "income" ? Colors.green : Colors.red;
                             return InkWell(
-                              onTap: () => _onTransactionTap(transaction), // تفعيل الضغط على المعاملة
-                              borderRadius: BorderRadius.circular(12), // زوايا دائرية لتتناسب مع الـ Card
-                              splashColor: Colors.blue.withOpacity(0.1), // لون الـ splash عند الضغط
-                              highlightColor: Colors.blue.withOpacity(0.05), // لون الـ highlight عند الضغط
+                              onTap: () => _onTransactionTap(transaction),
+                              borderRadius: BorderRadius.circular(12),
+                              splashColor: Colors.blue.withOpacity(0.1),
+                              highlightColor: Colors.blue.withOpacity(0.05),
                               child: Padding(
                                 padding: const EdgeInsets.all(8.0),
                                 child: Row(
                                   children: [
                                     // الأيقونة
                                     Text(
-                                      transaction['icon'],
-                                      style: const TextStyle(fontSize: 24), // زيادة حجم الأيقونة
+                                      transaction['icon'] ?? '📄', // استخدام قيمة افتراضية إذا كانت null
+                                      style: const TextStyle(fontSize: 24),
                                     ),
                                     const SizedBox(width: 12),
                                     // تفاصيل المعاملة
@@ -147,16 +147,16 @@ class TransactionCard extends StatelessWidget {
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
                                           Text(
-                                            transaction['category_name'],
+                                            transaction['category_name'] ?? 'Unknown Category', // استخدام قيمة افتراضية إذا كانت null
                                             style: const TextStyle(
-                                              fontSize: 16, // زيادة حجم الخط
+                                              fontSize: 16,
                                               fontWeight: FontWeight.w500,
                                             ),
                                           ),
                                           Text(
-                                            transaction['name'],
+                                            transaction['name'] ?? 'Unknown Name', // استخدام قيمة افتراضية إذا كانت null
                                             style: TextStyle(
-                                              fontSize: 14, // زيادة حجم الخط
+                                              fontSize: 14,
                                               color: Colors.grey[600],
                                             ),
                                           ),
@@ -165,9 +165,9 @@ class TransactionCard extends StatelessWidget {
                                     ),
                                     // المبلغ
                                     Text(
-                                      transaction['amount'],
+                                      transaction['amount']?.toString() ?? '0.00', // استخدام قيمة افتراضية إذا كانت null
                                       style: TextStyle(
-                                        fontSize: 16, // زيادة حجم الخط
+                                        fontSize: 16,
                                         fontWeight: FontWeight.bold,
                                         color: amountColor,
                                       ),
