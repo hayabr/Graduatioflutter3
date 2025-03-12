@@ -192,32 +192,33 @@ class _StatisticsState extends State<Statistics> {
       appBar: AppBar(
         title: Text("Statistics"),
         automaticallyImplyLeading: false,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16.0),
+            child: DropdownButton<String>(
+              value: selectedPeriod,
+              items: const [
+                DropdownMenuItem(value: "Daily", child: Text("Daily", style: TextStyle(fontSize: 16))),
+                DropdownMenuItem(value: "Weekly", child: Text("Weekly", style: TextStyle(fontSize: 16))),
+                DropdownMenuItem(value: "Monthly", child: Text("Monthly", style: TextStyle(fontSize: 16))),
+                DropdownMenuItem(value: "Yearly", child: Text("Yearly", style: TextStyle(fontSize: 16))),
+              ],
+              onChanged: (value) {
+                setState(() {
+                  selectedPeriod = value!;
+                  _fetchStatistics();
+                });
+              },
+              style: TextStyle(fontSize: 25, color: Colors.black, fontWeight: FontWeight.bold,),
+              underline: Container(), // إز0000الخط السفلي
+            ),
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                DropdownButton<String>(
-                  value: selectedPeriod,
-                  items: const [
-                    DropdownMenuItem(value: "Daily", child: Text("Daily")),
-                    DropdownMenuItem(value: "Weekly", child: Text("Weekly")),
-                    DropdownMenuItem(value: "Monthly", child: Text("Monthly")),
-                    DropdownMenuItem(value: "Yearly", child: Text("Yearly")),
-                  ],
-                  onChanged: (value) {
-                    setState(() {
-                      selectedPeriod = value!;
-                      _fetchStatistics();
-                    });
-                  },
-                ),
-                Text("Statistics", style: TextStyle(fontSize: 16)),
-              ],
-            ),
             SizedBox(height: 10),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -231,7 +232,7 @@ class _StatisticsState extends State<Statistics> {
                   child: Text(
                     "Income",
                     style: TextStyle(
-                      fontSize: 16,
+                      fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: showIncome ? Colors.blue : Colors.black,
                     ),
@@ -246,7 +247,7 @@ class _StatisticsState extends State<Statistics> {
                   child: Text(
                     "Expenses",
                     style: TextStyle(
-                      fontSize: 16,
+                      fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: !showIncome ? Colors.red : Colors.black,
                     ),
@@ -261,7 +262,7 @@ class _StatisticsState extends State<Statistics> {
                   : (expenseData.isNotEmpty ? expenseData : {"No Data": 1}),
               animationDuration: Duration(milliseconds: 800),
               chartLegendSpacing: 32,
-              chartRadius: MediaQuery.of(context).size.width / 2.5,
+              chartRadius: MediaQuery.of(context).size.width / 2, // تكبير حجم الدائرة
               chartType: ChartType.ring,
               legendOptions: LegendOptions(
                 showLegends: true,
