@@ -64,8 +64,8 @@ class _AccountsState extends State<Accounts> {
                       },
                       itemBuilder: (BuildContext context) => [
                         PopupMenuItem(value: "Add", child: Text("Add", style: TextStyle(fontSize: 18))),
-                        PopupMenuItem(value: "Delete", child: Text("Delete", style: TextStyle(fontSize: 18))),
-                        PopupMenuItem(value: "Modify Account", child: Text("Modify Account", style: TextStyle(fontSize: 18))),
+                      //  PopupMenuItem(value: "Delete", child: Text("Delete", style: TextStyle(fontSize: 18))),
+                      //  PopupMenuItem(value: "Modify Account", child: Text("Modify Account", style: TextStyle(fontSize: 18))),
                       ],
                       icon: Icon(Icons.more_vert),
                       offset: Offset(0, 40),

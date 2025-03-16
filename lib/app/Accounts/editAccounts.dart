@@ -5,28 +5,42 @@ import 'package:managermoney/controller/user_controller.dart';
 import 'package:managermoney/widgets/crud.dart';
 import 'package:managermoney/connstants/linkApi.dart';
 
-class AddAccount extends StatefulWidget {
+class UpdateAccount extends StatefulWidget {
+  final Map<String, dynamic> accountData;
+
+  UpdateAccount({required this.accountData});
+
   @override
-  _AddAccountState createState() => _AddAccountState();
+  _UpdateAccountState createState() => _UpdateAccountState();
 }
 
-class _AddAccountState extends State<AddAccount> {
+class _UpdateAccountState extends State<UpdateAccount> {
   final Crud crud = Crud();
   final UserController userController = Get.find<UserController>();
 
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _amountController = TextEditingController();
-  final TextEditingController _descriptionController = TextEditingController();
-  String _selectedGroup = 'Savings'; // Default group value
-  String _selectedClassification = 'Assets'; // Default classification value
+  late TextEditingController _nameController;
+  late TextEditingController _amountController;
+  late TextEditingController _descriptionController;
+  late String _selectedGroup;
+  late String _selectedClassification;
 
-  Future<void> _addAccount() async {
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.accountData['name']);
+    _amountController = TextEditingController(text: widget.accountData['amount']);
+    _descriptionController = TextEditingController(text: widget.accountData['description']);
+    _selectedGroup = widget.accountData['group'];
+    _selectedClassification = widget.accountData['classification']; // استخراج التصنيف الحالي
+  }
+
+  Future<void> _updateAccount() async {
     if (_formKey.currentState!.validate()) {
       String userId = userController.getUserId();
-
       try {
-        var response = await crud.postRequest(linkAddAccount, {
+        var response = await crud.postRequest(linkUpdateAccount, {
+          "id": widget.accountData['id'],
           "user_id": userId,
           "group": _selectedGroup,
           "name": _nameController.text,
@@ -38,14 +52,57 @@ class _AddAccountState extends State<AddAccount> {
         print("Raw Response: $response");
 
         if (response != null && response['status'] == "success") {
-          Get.snackbar("Success", "Account added successfully");
-          Get.offAll(Accounts()); // Navigate to Accounts page after adding
+          Get.snackbar("Success", "Account updated successfully");
+          Get.offAll(Accounts()); // Navigate to Accounts page after updating
         } else {
-          Get.snackbar("Error", "Failed to add account");
+          Get.snackbar("Error", "Failed to update account");
         }
       } catch (e) {
         print("Error catch $e");
-        Get.snackbar("Error", "An error occurred while adding the account");
+        Get.snackbar("Error", "An error occurred while updating the account");
+      }
+    }
+  }
+
+  Future<void> _deleteAccount() async {
+    // Show a confirmation dialog before deleting
+    bool confirmDelete = await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text("Delete Account"),
+        content: Text("Are you sure you want to delete this account?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text("Delete", style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmDelete == true) {
+      String userId = userController.getUserId();
+      try {
+        var response = await crud.postRequest(linkDeleteAccount, {
+          "id": widget.accountData['id'],
+          "user_id": userId,
+        });
+
+        print("Raw Response: $response");
+
+        if (response != null && response['status'] == "success") {
+          Get.snackbar("Success", "Account deleted successfully");
+          Get.offAll(Accounts()); // Navigate to Accounts page after deleting
+        } else {
+          Get.snackbar("Error", "Failed to delete account");
+        }
+      } catch (e) {
+        print("Error catch $e");
+        Get.snackbar("Error", "An error occurred while deleting the account");
       }
     }
   }
@@ -54,7 +111,22 @@ class _AddAccountState extends State<AddAccount> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Add Account"),
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+            Text("Account Info"),
+          ],
+        ),
+        actions: [
+          Padding(
+            padding: EdgeInsets.only(right: 13.0),
+            child: IconButton(
+              icon: Icon(Icons.delete, color: Colors.grey[800]),
+              iconSize: 30,
+              onPressed: _deleteAccount,
+            ),
+          ),
+        ],
       ),
       body: Directionality(
         textDirection: TextDirection.ltr, // Set text direction to LTR
@@ -172,17 +244,17 @@ class _AddAccountState extends State<AddAccount> {
                 ),
                 SizedBox(height: 20),
 
-                // Save Button
+                // Update Button
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: _addAccount,
+                    onPressed: _updateAccount,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.red, // Change button color to red
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       padding: EdgeInsets.symmetric(vertical: 14),
                     ),
-                    child: Text("Save", style: TextStyle(fontSize: 18, color: Colors.white)),
+                    child: Text("Update", style: TextStyle(fontSize: 18, color: Colors.white)),
                   ),
                 ),
               ],
