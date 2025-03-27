@@ -24,3 +24,8 @@ const String linkViewStaticWeekly ="$linkServerName/Statistics/getStatisticsWeek
 const String linkViewStaticMonthly ="$linkServerName/Statistics/getStatisticsMonthly.php";
 const String linkViewStaticYearly ="$linkServerName/Statistics/getStatisticsYearly.php";
 const String linkGetCategory ="$linkServerName/Statistics/getCategory.php";
+//Notifications 
+const String linkViewNotification ="$linkServerName/Notification/readNotif.php";
+const String linkinsertNotification ="$linkServerName/Notification/addNoti.php";
+const String linkMarkNotificationsRead ="$linkServerName/Notification/markNotificationasRead.php";
+
