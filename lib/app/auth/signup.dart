@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:managermoney/components/crud.dart';
-import 'package:managermoney/components/customtextform.dart';
-import 'package:managermoney/components/valid.dart';
+
 import 'package:managermoney/connstants/linkApi.dart';
+import 'package:managermoney/widgets/crud.dart';
+import 'package:managermoney/widgets/customtextform.dart';
+import 'package:managermoney/widgets/valid.dart';
 
 class Signup extends StatefulWidget {
   const Signup({super.key});

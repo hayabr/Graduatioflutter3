@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:managermoney/components/BottomNavBar.dart';
+import 'package:managermoney/widgets/BottomNavBar.dart';
 
 class More extends StatefulWidget {
   const More({super.key});

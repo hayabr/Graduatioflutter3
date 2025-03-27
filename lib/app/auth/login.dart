@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:managermoney/components/crud.dart';
-import 'package:managermoney/components/customtextform.dart';
-import 'package:managermoney/components/valid.dart';
 import 'package:managermoney/connstants/linkApi.dart';
 import 'package:awesome_dialog/awesome_dialog.dart'; //pub
 import 'package:get/get.dart'; // استيراد GetX
 import 'package:managermoney/controller/user_controller.dart';
+import 'package:managermoney/widgets/crud.dart';
+import 'package:managermoney/widgets/customtextform.dart';
+import 'package:managermoney/widgets/valid.dart';
  // استيراد UserController
 
 class Login extends StatefulWidget {

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:managermoney/app/Notification/globalVariable.dart';
 import 'package:managermoney/app/Transaction/home.dart';
 import 'package:managermoney/controller/user_controller.dart';
 import 'package:managermoney/widgets/crud.dart';
 import 'package:managermoney/connstants/linkApi.dart';
-import 'package:intl/intl.dart'; // استيراد مكتبة intl لتنسيق التاريخ
+import 'package:intl/intl.dart';
 
 class AddTransaction extends StatefulWidget {
   @override
@@ -18,11 +19,11 @@ class _AddTransactionState extends State<AddTransaction> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _noteController = TextEditingController();
-  final TextEditingController _dateController = TextEditingController(); // حقل التاريخ
+  final TextEditingController _dateController = TextEditingController();
 
-  String _selectedAccount = '';
-  String _selectedType = 'income'; // Default transaction type
-  String _selectedCategory = '';
+  String? _selectedAccount;
+  String _selectedType = 'income';
+  String? _selectedCategory;
   DateTime _selectedDate = DateTime.now();
   List<Map<String, dynamic>> userAccounts = [];
   List<Map<String, dynamic>> incomeCategories = [];
@@ -33,7 +34,7 @@ class _AddTransactionState extends State<AddTransaction> {
     super.initState();
     _fetchUserAccounts();
     _fetchCategories();
-    _dateController.text = DateFormat('yyyy-MM-dd').format(_selectedDate); // Initialize date
+    _dateController.text = DateFormat('yyyy-MM-dd').format(_selectedDate);
   }
 
   Future<void> _fetchUserAccounts() async {
@@ -80,8 +81,25 @@ class _AddTransactionState extends State<AddTransaction> {
     if (picked != null && picked != _selectedDate) {
       setState(() {
         _selectedDate = picked;
-        _dateController.text = DateFormat('yyyy-MM-dd').format(_selectedDate); // Update the date text
+        _dateController.text = DateFormat('yyyy-MM-dd').format(_selectedDate);
       });
+    }
+  }
+
+  Future<void> _insertNotification(String message) async {
+    try {
+      String userId = userController.getUserId();
+      var response = await crud.postRequest(linkinsertNotification, {
+        "user_id": userId,
+        "message": message,
+      });
+
+      if (response != null && response['status'] == "success") {
+        NotificationGlobals.updateUnreadCount(
+          NotificationGlobals.unreadNotificationsCount.value + 1);
+      }
+    } catch (e) {
+      print("Error inserting notification: $e");
     }
   }
 
@@ -91,16 +109,44 @@ class _AddTransactionState extends State<AddTransaction> {
       try {
         var response = await crud.postRequest(linkAddTransaction, {
           "user_id": userId,
-          "account_id": _selectedAccount,
-          "category_id": _selectedCategory,
+          "account_id": _selectedAccount ?? "",
+          "category_id": _selectedCategory ?? "",
           "amount": _amountController.text,
           "type": _selectedType,
           "note": _noteController.text,
-          "transaction_date": _selectedDate.toIso8601String(), // Send the selected date
+          "transaction_date": _selectedDate.toIso8601String(),
         });
 
         if (response != null && response['status'] == "success") {
-          Get.snackbar("Success", "Transaction added successfully");
+          // Always insert success notification
+          await _insertNotification("Transaction added: ${_amountController.text} ${_selectedType}");
+
+          if (response.containsKey('message')) {
+            // Insert budget exceeded notification
+            await _insertNotification("Budget Alert: ${response['message']}");
+
+            // Display the budget exceeded notification with an "OK" button at the top of the screen
+            Get.snackbar(
+              "Budget Exceeded",
+              response['message'],
+              snackPosition: SnackPosition.TOP,
+              backgroundColor: Colors.orange,
+              colorText: Colors.white,
+              duration: Duration(seconds: 5),
+              mainButton: TextButton(
+                onPressed: () {
+                  // Close the snackbar when the button is pressed
+                  Get.back();
+                },
+                child: Text("OK", style: TextStyle(color: Colors.white)),
+              ),
+            );
+
+            // No need to show "Success" notification here
+          } else {
+            // Show the success notification only if there is no budget issue
+            Get.snackbar("Success", "Transaction added successfully");
+          }
           Get.offAll(Home());
         } else {
           Get.snackbar("Error", "Failed to add transaction");
@@ -125,33 +171,34 @@ class _AddTransactionState extends State<AddTransaction> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               DropdownButtonFormField<String>(
-                value: _selectedAccount.isNotEmpty ? _selectedAccount : null,
+                value: _selectedAccount,
                 decoration: InputDecoration(
                   labelText: 'Account',
-                  labelStyle: TextStyle(fontSize: 16), // زيادة حجم الخط
+                  labelStyle: TextStyle(fontSize: 16),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                 ),
                 items: userAccounts.map<DropdownMenuItem<String>>((account) {
                   return DropdownMenuItem<String>(
                     value: account['id'].toString(),
-                    child: Text(account['name'], style: TextStyle(fontSize: 16)), // زيادة حجم الخط
+                    child: Text(account['name'], style: TextStyle(fontSize: 16)),
                   );
                 }).toList(),
                 onChanged: (String? newValue) {
                   setState(() {
-                    _selectedAccount = newValue!;
+                    _selectedAccount = newValue;
                   });
                 },
               ),
               SizedBox(height: 10),
+
               TextFormField(
                 controller: _amountController,
                 decoration: InputDecoration(
                   labelText: 'Amount',
-                  labelStyle: TextStyle(fontSize: 16), // زيادة حجم الخط
+                  labelStyle: TextStyle(fontSize: 16),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                style: TextStyle(fontSize: 16), // زيادة حجم الخط
+                style: TextStyle(fontSize: 16),
                 keyboardType: TextInputType.number,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -161,11 +208,12 @@ class _AddTransactionState extends State<AddTransaction> {
                 },
               ),
               SizedBox(height: 10),
+
               DropdownButtonFormField<String>(
                 value: _selectedType,
                 decoration: InputDecoration(
                   labelText: 'Transaction Type',
-                  labelStyle: TextStyle(fontSize: 16), // زيادة حجم الخط
+                  labelStyle: TextStyle(fontSize: 16),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                 ),
                 items: [
@@ -175,17 +223,17 @@ class _AddTransactionState extends State<AddTransaction> {
                 onChanged: (String? newValue) {
                   setState(() {
                     _selectedType = newValue!;
-                    _selectedCategory = ''; // Reset category when type changes
+                    _selectedCategory = null;
                   });
                 },
               ),
               SizedBox(height: 10),
-              // Category dropdown
+
               DropdownButtonFormField<String>(
-                value: _selectedCategory.isNotEmpty ? _selectedCategory : null,
+                value: _selectedCategory,
                 decoration: InputDecoration(
                   labelText: 'Category',
-                  labelStyle: TextStyle(fontSize: 16), // زيادة حجم الخط
+                  labelStyle: TextStyle(fontSize: 16),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                   suffixIcon: Icon(Icons.category),
                 ),
@@ -193,40 +241,43 @@ class _AddTransactionState extends State<AddTransaction> {
                     .map<DropdownMenuItem<String>>((category) {
                   return DropdownMenuItem<String>(
                     value: category['id'].toString(),
-                    child: Text(category['name'], style: TextStyle(fontSize: 16)), // زيادة حجم الخط
+                    child: Text(category['name'], style: TextStyle(fontSize: 16)),
                   );
                 }).toList(),
                 onChanged: (String? newValue) {
                   setState(() {
-                    _selectedCategory = newValue!;
+                    _selectedCategory = newValue;
                   });
                 },
               ),
               SizedBox(height: 10),
+
               TextFormField(
                 controller: _dateController,
                 readOnly: true,
                 decoration: InputDecoration(
                   labelText: 'Transaction Date',
-                  labelStyle: TextStyle(fontSize: 16), // زيادة حجم الخط
+                  labelStyle: TextStyle(fontSize: 16),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                   suffixIcon: Icon(Icons.calendar_today),
                 ),
-                style: TextStyle(fontSize: 16), // زيادة حجم الخط
+                style: TextStyle(fontSize: 16),
                 onTap: () => _selectDate(context),
               ),
               SizedBox(height: 10),
+
               TextFormField(
                 controller: _noteController,
                 decoration: InputDecoration(
                   labelText: 'Note',
-                  labelStyle: TextStyle(fontSize: 16), // زيادة حجم الخط
+                  labelStyle: TextStyle(fontSize: 16),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                style: TextStyle(fontSize: 16), // زيادة حجم الخط
+                style: TextStyle(fontSize: 16),
                 maxLines: 3,
               ),
               SizedBox(height: 20),
+
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(

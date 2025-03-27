@@ -97,6 +97,16 @@ class _UpdateAccountState extends State<UpdateAccount> {
         if (response != null && response['status'] == "success") {
           Get.snackbar("Success", "Account deleted successfully");
           Get.offAll(Accounts()); // Navigate to Accounts page after deleting
+        } else if (response != null && response['status'] == "error" && response['message'] == "الحساب مرتبط بمعاملة ولا يمكن حذفه إلا بعد حذف المعاملة المرتبطة به") {
+          // إذا كان الحساب مرتبطًا بمعاملة
+          Get.snackbar(
+            "Error",
+            "This account cannot be deleted because it is linked to one or more transactions. To delete this account, please first delete all associated transactions from the transactions section.",
+            duration: Duration(seconds: 7), // زيادة مدة عرض الرسالة
+            snackPosition: SnackPosition.TOP, // عرض الرسالة في الأعلى
+            backgroundColor: Colors.red, // لون الخلفية
+            colorText: Colors.white, // لون النص
+          );
         } else {
           Get.snackbar("Error", "Failed to delete account");
         }

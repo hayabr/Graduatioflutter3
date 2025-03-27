@@ -1,25 +1,48 @@
 import 'package:flutter/material.dart';
+import 'package:managermoney/app/Notification/globalVariable.dart';
 import 'package:managermoney/app/Transaction/addTransaction.dart';
 import 'package:managermoney/widgets/BottomNavBar.dart';
 import 'package:managermoney/controller/user_controller.dart';
 import 'package:get/get.dart';
 import 'package:managermoney/widgets/widgetTransactions/summaryBox.dart';
 import 'package:managermoney/widgets/widgetTransactions/transaction_list.dart';
- // استيراد صفحة addTransaction
+import 'package:managermoney/app/Notification/readNotification.dart';
+
 class Home extends StatefulWidget {
   const Home({Key? key}) : super(key: key);
 
   @override
-  _HomeState createState() => _HomeState();
+  HomeState createState() => HomeState();
 }
 
-class _HomeState extends State<Home> {
+class HomeState extends State<Home> {
   int _selectedIndex = 0;
   final UserController userController = Get.find<UserController>();
+  bool showNotificationBadge = true; // متغير للتحكم في ظهور العداد
 
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
+    });
+  }
+
+  Future<void> _navigateToNotificationsScreen(BuildContext context) async {
+    setState(() {
+      showNotificationBadge = false; // إخفاء العداد
+    });
+
+    // تحديث حالة القراءة في الخلفية
+    NotificationGlobals.updateUnreadCount(0);
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const NotificationsPage(),
+      ),
+    );
+
+    setState(() {
+      showNotificationBadge = NotificationGlobals.unreadNotificationsCount.value > 0;
     });
   }
 
@@ -33,7 +56,7 @@ class _HomeState extends State<Home> {
         backgroundColor: Colors.white,
         elevation: 0,
         automaticallyImplyLeading: false,
-        title: Align(
+        title: const Align(
           alignment: Alignment.centerLeft,
           child: Text(
             "Money Manager",
@@ -46,8 +69,47 @@ class _HomeState extends State<Home> {
             onPressed: () {},
           ),
           IconButton(
-            icon: const Icon(Icons.star_border, color: Colors.black),
-            onPressed: () {},
+            icon: Obx(() => Stack(
+              children: [
+                Transform.scale(
+                  scale: 1.3, // تكبير الأيقونة
+                  child: const Icon(Icons.notifications_none, color: Colors.black),
+                ),
+                if (showNotificationBadge && NotificationGlobals.unreadNotificationsCount.value > 0)
+                  Positioned(
+                    right: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 12,
+                        minHeight: 12,
+                      ),
+                      child: Text(
+                        '${NotificationGlobals.unreadNotificationsCount.value}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 8,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
+            )),
+            onPressed: () {
+              setState(() {
+                // عند الضغط على الأيقونة، إخفاء العداد وتحديثه ليصبح صفرًا
+                NotificationGlobals.updateUnreadCount(0); 
+                showNotificationBadge = false; // إخفاء العداد
+              });
+
+              // الانتقال إلى صفحة الإشعارات
+              _navigateToNotificationsScreen(context);
+            },
           ),
         ],
       ),
@@ -57,25 +119,21 @@ class _HomeState extends State<Home> {
             Expanded(
               child: CustomScrollView(
                 slivers: [
-                  SliverToBoxAdapter(
+                  const SliverToBoxAdapter(
                     child: Divider(
                       thickness: 1,
                       height: 1,
                       color: Colors.grey,
-                      indent: 0,
-                      endIndent: 0,
                     ),
                   ),
                   SliverToBoxAdapter(
                     child: Container(
                       color: Colors.white,
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          children: [
-                            SummaryRow(),
-                          ],
-                        ),
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        children: [
+                          SummaryRow(),
+                        ],
                       ),
                     ),
                   ),
@@ -129,7 +187,7 @@ class _HomeState extends State<Home> {
         onPressed: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => AddTransaction()),
+            MaterialPageRoute(builder: (context) =>  AddTransaction()),
           );
         },
         backgroundColor: Colors.red,
