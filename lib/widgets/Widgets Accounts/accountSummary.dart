@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:managermoney/connstants/linkApi.dart';
-import 'package:managermoney/controller/user_controller.dart';
+import 'package:graduationproject/connstants/linkApi.dart';
+import 'package:graduationproject/controller/user_controller.dart';
+import 'package:graduationproject/widgets/crud.dart';
 import 'package:get/get.dart';
-import 'package:managermoney/widgets/crud.dart';
+
 
 class AccountSummary extends StatelessWidget {
   final Crud crud = Crud();
   final UserController userController = Get.find<UserController>();
+
+  AccountSummary({super.key});
 
   Future<dynamic> getAccountSummary() async {
     String userId = userController.getUserId();
@@ -34,13 +37,13 @@ class AccountSummary extends StatelessWidget {
       children: [
         Text(
           title,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
             color: Colors.black, // العنوان دائماً أسود
           ),
         ),
-        SizedBox(height: 4),
+        const SizedBox(height: 4),
         Text(
           value,
           style: TextStyle(
@@ -59,7 +62,7 @@ class AccountSummary extends StatelessWidget {
       future: getAccountSummary(),
       builder: (BuildContext context, AsyncSnapshot snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(child: CircularProgressIndicator());
+          return const Center(child: CircularProgressIndicator());
         } else if (snapshot.hasError) {
           return Center(child: Text("Error: ${snapshot.error}"));
         } 
@@ -69,11 +72,11 @@ class AccountSummary extends StatelessWidget {
             padding: const EdgeInsets.only(right: 17.0, left: 17.0),
             child: Row(
               children: [
-                SizedBox(height: 2),
+                const SizedBox(height: 2),
                 _buildSummaryItem('Assets', "0", Colors.blue),
-                SizedBox(width: 90),
+                const SizedBox(width: 90),
                 _buildSummaryItem('Liabilities', "0", Colors.red),
-                SizedBox(width: 90),
+                const SizedBox(width: 90),
                 _buildSummaryItem('Total', "0", Colors.black),
               ],
             ),
@@ -92,17 +95,17 @@ class AccountSummary extends StatelessWidget {
               padding: const EdgeInsets.only(right: 17.0, left: 17.0),
               child: Row(
                 children: [
-                  SizedBox(height: 2),
+                  const SizedBox(height: 2),
                   _buildSummaryItem('Assets', assets, Colors.blue),
-                  SizedBox(width: 90),
+                  const SizedBox(width: 90),
                   _buildSummaryItem('Liabilities', liabilities, Colors.red),
-                  SizedBox(width: 90),
+                  const SizedBox(width: 90),
                   _buildSummaryItem('Total', total, Colors.black),
                 ],
               ),
             );
           } else {
-            return Center(child: Text("Invalid data format"));
+            return const Center(child: Text("Invalid data format"));
           }
         }
         return Container();

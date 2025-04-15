@@ -1,18 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:managermoney/app/Accounts/accounts.dart';
-import 'package:managermoney/app/More/more.dart';
-import 'package:managermoney/app/Transaction/home.dart';
-import 'package:managermoney/controller/user_controller.dart';
-import 'package:managermoney/widgets/crud.dart';
-import 'package:managermoney/connstants/linkApi.dart';
-import 'package:pie_chart/pie_chart.dart';
-import 'package:managermoney/widgets/BottomNavBar.dart'; // تأكد من استيراد BottomNavBar
-import 'package:managermoney/app/Transaction/addTransaction.dart'; // إذا كنت تريد إضافة FloatingActionButton
+import 'package:fl_chart/fl_chart.dart';
+import 'package:graduationproject/app/Accounts/accounts.dart';
+import 'package:graduationproject/app/More/more.dart';
+import 'package:graduationproject/app/Transaction/home.dart';
+import 'package:graduationproject/connstants/linkApi.dart';
+import 'package:graduationproject/controller/user_controller.dart';
+import 'package:graduationproject/widgets/BottomNavBar.dart';
+import 'package:graduationproject/widgets/crud.dart';
 
 class Statistics extends StatefulWidget {
+  const Statistics({super.key});
+
   @override
-  _StatisticsState createState() => _StatisticsState();
+  State<Statistics> createState() => _StatisticsState();
 }
 
 class _StatisticsState extends State<Statistics> {
@@ -24,7 +25,7 @@ class _StatisticsState extends State<Statistics> {
   double totalExpenses = 0;
   String selectedPeriod = "Monthly";
   bool showIncome = true;
-  int _selectedIndex = 1; // أيقونة الإحصائيات لها index = 1
+  int _selectedIndex = 1;
 
   @override
   void initState() {
@@ -55,77 +56,36 @@ class _StatisticsState extends State<Statistics> {
 
     try {
       var response = await crud.postRequest(link, {"user_id": userId});
-      print("Response: $response"); // طباعة الاستجابة للتأكد من البيانات
-
       if (response != null && response['status'] == "success") {
-        if (response['data'] is List) {
-          // إذا كانت البيانات قائمة
-          List<dynamic> dataList = response['data'];
-          _processListData(dataList);
-        } else if (response['data'] is Map) {
-          // إذا كانت البيانات خريطة
-          Map<String, dynamic> dataMap = response['data'];
-          _processMapData(dataMap);
-        } else {
-          print("Unknown data structure");
+        if (response['data'] is Map) {
+          _processMapData(response['data']);
         }
-      } else {
-        print("No data found or status is not success");
       }
     } catch (e) {
       print("Error fetching statistics: $e");
     }
   }
 
-  void _processListData(List<dynamic> dataList) async {
-    Map<String, double> incomeDataWithNames = {};
-    Map<String, double> expenseDataWithNames = {};
-
-    for (var item in dataList) {
-      if (item['type'] == 'income') {
-        var categoryData = await _fetchCategoryData(item['category_id']);
-        if (categoryData != null) {
-          incomeDataWithNames["${categoryData['name']} ${categoryData['icon']}"] = (item['amount'] as num).toDouble();
-        }
-      } else if (item['type'] == 'expense') {
-        var categoryData = await _fetchCategoryData(item['category_id']);
-        if (categoryData != null) {
-          expenseDataWithNames["${categoryData['name']} ${categoryData['icon']}"] = (item['amount'] as num).toDouble();
-        }
-      }
-    }
-
-    setState(() {
-      totalIncome = incomeDataWithNames.values.fold(0, (prev, amount) => prev + amount);
-      totalExpenses = expenseDataWithNames.values.fold(0, (prev, amount) => prev + amount);
-      incomeData = incomeDataWithNames;
-      expenseData = expenseDataWithNames;
-    });
-
-    print("Income Data: $incomeDataWithNames"); // طباعة بيانات الدخل
-    print("Expense Data: $expenseDataWithNames"); // طباعة بيانات المصروفات
-  }
-
   void _processMapData(Map<String, dynamic> dataMap) async {
     Map<String, double> incomeDataWithNames = {};
     Map<String, double> expenseDataWithNames = {};
 
-    // جلب أسماء الفئات والأيقونات لبيانات الدخل
     if (dataMap['income_percentages'] is Map) {
       for (var entry in (dataMap['income_percentages'] as Map<String, dynamic>).entries) {
         var categoryData = await _fetchCategoryData(entry.key);
         if (categoryData != null) {
-          incomeDataWithNames["${categoryData['name']} ${categoryData['icon']}"] = (entry.value as num).toDouble();
+          incomeDataWithNames["${categoryData['name']} ${categoryData['icon']}"] =
+              (entry.value as num).toDouble();
         }
       }
     }
 
-    // جلب أسماء الفئات والأيقونات لبيانات المصروفات
     if (dataMap['expense_percentages'] is Map) {
       for (var entry in (dataMap['expense_percentages'] as Map<String, dynamic>).entries) {
         var categoryData = await _fetchCategoryData(entry.key);
         if (categoryData != null) {
-          expenseDataWithNames["${categoryData['name']} ${categoryData['icon']}"] = (entry.value as num).toDouble();
+          expenseDataWithNames["${categoryData['name']} ${categoryData['icon']}"] =
+              (entry.value as num).toDouble();
         }
       }
     }
@@ -136,9 +96,6 @@ class _StatisticsState extends State<Statistics> {
       incomeData = incomeDataWithNames;
       expenseData = expenseDataWithNames;
     });
-
-    print("Income Data: $incomeDataWithNames"); // طباعة بيانات الدخل
-    print("Expense Data: $expenseDataWithNames"); // طباعة بيانات المصروفات
   }
 
   Future<Map<String, dynamic>?> _fetchCategoryData(String categoryId) async {
@@ -158,50 +115,57 @@ class _StatisticsState extends State<Statistics> {
       _selectedIndex = index;
     });
 
-    // التنقل بين الصفحات
     switch (index) {
       case 0:
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => Home()),
-        );
-        break;
-      case 1:
-        // الصفحة الحالية (الإحصائيات)
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const Home()));
         break;
       case 2:
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => Accounts()),
-        );
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const Accounts()));
         break;
       case 3:
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => More()),
-        );
-        break;
-      default:
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const More()));
         break;
     }
   }
 
+  List<BarChartGroupData> _buildBarChartData(List<String> keys, Map<String, double> data) {
+    return data.entries.toList().asMap().entries.map((entry) {
+      int index = entry.key;
+      double percentage = entry.value.value;
+
+      return BarChartGroupData(
+        x: index,
+        barRods: [
+          BarChartRodData(
+            toY: percentage,
+            width: 22,
+            borderRadius: BorderRadius.circular(6),
+            color: showIncome ? Colors.blue : Colors.red,
+          ),
+        ],
+      );
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final currentData = showIncome ? incomeData : expenseData;
+    final dataKeys = currentData.keys.toList();
+
     return Scaffold(
       appBar: AppBar(
-        title: Text("Statistics"),
+        title: const Text("Statistics"),
         automaticallyImplyLeading: false,
         actions: [
           Padding(
-            padding: const EdgeInsets.only(right: 16.0),
+            padding: const EdgeInsets.only(right: 16),
             child: DropdownButton<String>(
               value: selectedPeriod,
               items: const [
-                DropdownMenuItem(value: "Daily", child: Text("Daily", style: TextStyle(fontSize: 16))),
-                DropdownMenuItem(value: "Weekly", child: Text("Weekly", style: TextStyle(fontSize: 16))),
-                DropdownMenuItem(value: "Monthly", child: Text("Monthly", style: TextStyle(fontSize: 16))),
-                DropdownMenuItem(value: "Yearly", child: Text("Yearly", style: TextStyle(fontSize: 16))),
+                DropdownMenuItem(value: "Daily", child: Text("Daily")),
+                DropdownMenuItem(value: "Weekly", child: Text("Weekly")),
+                DropdownMenuItem(value: "Monthly", child: Text("Monthly")),
+                DropdownMenuItem(value: "Yearly", child: Text("Yearly")),
               ],
               onChanged: (value) {
                 setState(() {
@@ -209,26 +173,20 @@ class _StatisticsState extends State<Statistics> {
                   _fetchStatistics();
                 });
               },
-              style: TextStyle(fontSize: 25, color: Colors.black, fontWeight: FontWeight.bold,),
-              underline: Container(), // إز0000الخط السفلي
+              underline: Container(),
             ),
           ),
         ],
       ),
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            SizedBox(height: 10),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      showIncome = true;
-                    });
-                  },
+                  onTap: () => setState(() => showIncome = true),
                   child: Text(
                     "Income",
                     style: TextStyle(
@@ -239,11 +197,7 @@ class _StatisticsState extends State<Statistics> {
                   ),
                 ),
                 GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      showIncome = false;
-                    });
-                  },
+                  onTap: () => setState(() => showIncome = false),
                   child: Text(
                     "Expenses",
                     style: TextStyle(
@@ -255,34 +209,68 @@ class _StatisticsState extends State<Statistics> {
                 ),
               ],
             ),
-            SizedBox(height: 20),
-            PieChart(
-              dataMap: showIncome
-                  ? (incomeData.isNotEmpty ? incomeData : {"No Data": 1})
-                  : (expenseData.isNotEmpty ? expenseData : {"No Data": 1}),
-              animationDuration: Duration(milliseconds: 800),
-              chartLegendSpacing: 32,
-              chartRadius: MediaQuery.of(context).size.width / 2, // تكبير حجم الدائرة
-              chartType: ChartType.ring,
-              legendOptions: LegendOptions(
-                showLegends: true,
-                legendPosition: LegendPosition.right,
-              ),
-              chartValuesOptions: ChartValuesOptions(
-                showChartValues: true,
-                showChartValuesInPercentage: true,
-              ),
-            ),
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
+            currentData.isNotEmpty
+                ? SizedBox(
+                    height: 300,
+                    child: BarChart(
+                      BarChartData(
+                        barGroups: _buildBarChartData(dataKeys, currentData),
+                        gridData: FlGridData(show: true),
+                        borderData: FlBorderData(show: false),
+                        titlesData: FlTitlesData(
+                          bottomTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              getTitlesWidget: (value, meta) {
+                                if (value.toInt() < dataKeys.length) {
+                                  return Text(
+                                    dataKeys[value.toInt()].split(' ').first,
+                                    style: const TextStyle(fontSize: 10),
+                                  );
+                                }
+                                return const SizedBox.shrink();
+                              },
+                              reservedSize: 42,
+                            ),
+                          ),
+                          leftTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              interval: 20,
+                              getTitlesWidget: (value, meta) {
+                                return Text("${value.toInt()}%");
+                              },
+                              reservedSize: 40,
+                            ),
+                          ),
+                          topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                          rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        ),
+                      ),
+                    ),
+                  )
+                : const Center(child: Text("There is no Data")),
+            const SizedBox(height: 20),
             Expanded(
-              child: (showIncome ? incomeData : expenseData).isNotEmpty
+              child: currentData.isNotEmpty
                   ? ListView(
-                      children: (showIncome ? incomeData : expenseData)
-                          .entries
-                          .map((entry) => _buildExpenseItem(entry.key, entry.value))
+                      children: currentData.entries
+                          .map((entry) => Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(entry.key, style: const TextStyle(fontSize: 16)),
+                                    Text("${entry.value.toStringAsFixed(2)}%",
+                                        style: const TextStyle(
+                                            fontSize: 16, fontWeight: FontWeight.bold)),
+                                  ],
+                                ),
+                              ))
                           .toList(),
                     )
-                  : Center(child: Text("There is no Data")),
+                  : const Center(child: Text("There is no Data")),
             ),
           ],
         ),
@@ -290,30 +278,6 @@ class _StatisticsState extends State<Statistics> {
       bottomNavigationBar: BottomNavBar(
         selectedIndex: _selectedIndex,
         onItemTapped: _onItemTapped,
-      ),
-    );
-  }
-
-  Widget _buildExpenseItem(String category, double amount) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          RichText(
-            text: TextSpan(
-              style: TextStyle(fontSize: 16, color: Colors.black),
-              children: [
-                TextSpan(
-                  text: "${amount.toStringAsFixed(2)}%",
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                TextSpan(text: "   "), // زيادة المسافة بين النسبة واسم الفئة
-                TextSpan(text: category),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }

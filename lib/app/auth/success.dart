@@ -18,13 +18,13 @@ class _SuccessState extends State<Success> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
+              const Icon(
                 Icons.check_circle_outline,
                 size: 100,
                 color: Colors.green,
               ),
               const SizedBox(height: 20),
-              Text(
+              const Text(
                 "Account created successfully!",
                 style: TextStyle(
                   fontSize: 24,
@@ -39,7 +39,7 @@ class _SuccessState extends State<Success> {
                   // Navigate to the login screen
                   Navigator.of(context).pushReplacementNamed('login');
                 },
-                color: Color.fromARGB(255, 28, 132, 90),
+                color: const Color.fromARGB(255, 28, 132, 90),
                 padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 80),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),

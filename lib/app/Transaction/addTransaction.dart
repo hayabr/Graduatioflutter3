@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:managermoney/app/Notification/globalVariable.dart';
-import 'package:managermoney/app/Transaction/home.dart';
-import 'package:managermoney/controller/user_controller.dart';
-import 'package:managermoney/widgets/crud.dart';
-import 'package:managermoney/connstants/linkApi.dart';
+import 'package:graduationproject/app/Notification/globalVariable.dart';
+import 'package:graduationproject/app/Transaction/home.dart';
+import 'package:graduationproject/connstants/linkApi.dart';
+import 'package:graduationproject/controller/user_controller.dart';
+import 'package:graduationproject/widgets/crud.dart';
+
 import 'package:intl/intl.dart';
 
 class AddTransaction extends StatefulWidget {
+  const AddTransaction({super.key});
+
   @override
   _AddTransactionState createState() => _AddTransactionState();
 }
@@ -103,6 +106,27 @@ class _AddTransactionState extends State<AddTransaction> {
     }
   }
 
+  Future<void> _showBudgetExceededDialog(String message) async {
+    return showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("Budget Exceeded", style: TextStyle(color: Colors.orange)),
+          content: Text(message),
+          actions: <Widget>[
+            TextButton(
+              child: const Text("OK", style: TextStyle(color: Colors.orange)),
+              onPressed: () {
+                Navigator.of(context).pop(); // Close the dialog
+                Get.offAll(const Home()); // Navigate to home after closing
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _addTransaction() async {
     if (_formKey.currentState!.validate()) {
       String userId = userController.getUserId();
@@ -119,35 +143,19 @@ class _AddTransactionState extends State<AddTransaction> {
 
         if (response != null && response['status'] == "success") {
           // Always insert success notification
-          await _insertNotification("Transaction added: ${_amountController.text} ${_selectedType}");
+          await _insertNotification("Transaction added: ${_amountController.text} $_selectedType");
 
           if (response.containsKey('message')) {
             // Insert budget exceeded notification
             await _insertNotification("Budget Alert: ${response['message']}");
-
-            // Display the budget exceeded notification with an "OK" button at the top of the screen
-            Get.snackbar(
-              "Budget Exceeded",
-              response['message'],
-              snackPosition: SnackPosition.TOP,
-              backgroundColor: Colors.orange,
-              colorText: Colors.white,
-              duration: Duration(seconds: 5),
-              mainButton: TextButton(
-                onPressed: () {
-                  // Close the snackbar when the button is pressed
-                  Get.back();
-                },
-                child: Text("OK", style: TextStyle(color: Colors.white)),
-              ),
-            );
-
-            // No need to show "Success" notification here
+            
+            // Show the dialog for budget exceeded
+            await _showBudgetExceededDialog(response['message']);
           } else {
             // Show the success notification only if there is no budget issue
             Get.snackbar("Success", "Transaction added successfully");
+            Get.offAll(const Home());
           }
-          Get.offAll(Home());
         } else {
           Get.snackbar("Error", "Failed to add transaction");
         }
@@ -161,7 +169,7 @@ class _AddTransactionState extends State<AddTransaction> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Add Transaction"),
+        title: const Text("Add Transaction"),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -174,13 +182,13 @@ class _AddTransactionState extends State<AddTransaction> {
                 value: _selectedAccount,
                 decoration: InputDecoration(
                   labelText: 'Account',
-                  labelStyle: TextStyle(fontSize: 16),
+                  labelStyle: const TextStyle(fontSize: 16),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                 ),
                 items: userAccounts.map<DropdownMenuItem<String>>((account) {
                   return DropdownMenuItem<String>(
                     value: account['id'].toString(),
-                    child: Text(account['name'], style: TextStyle(fontSize: 16)),
+                    child: Text(account['name'], style: const TextStyle(fontSize: 16)),
                   );
                 }).toList(),
                 onChanged: (String? newValue) {
@@ -189,16 +197,16 @@ class _AddTransactionState extends State<AddTransaction> {
                   });
                 },
               ),
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
 
               TextFormField(
                 controller: _amountController,
                 decoration: InputDecoration(
                   labelText: 'Amount',
-                  labelStyle: TextStyle(fontSize: 16),
+                  labelStyle: const TextStyle(fontSize: 16),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                style: TextStyle(fontSize: 16),
+                style: const TextStyle(fontSize: 16),
                 keyboardType: TextInputType.number,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -207,16 +215,16 @@ class _AddTransactionState extends State<AddTransaction> {
                   return null;
                 },
               ),
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
 
               DropdownButtonFormField<String>(
                 value: _selectedType,
                 decoration: InputDecoration(
                   labelText: 'Transaction Type',
-                  labelStyle: TextStyle(fontSize: 16),
+                  labelStyle: const TextStyle(fontSize: 16),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                items: [
+                items: const [
                   DropdownMenuItem(value: 'income', child: Text('Income', style: TextStyle(fontSize: 16))),
                   DropdownMenuItem(value: 'expenses', child: Text('Expense', style: TextStyle(fontSize: 16))),
                 ],
@@ -227,21 +235,21 @@ class _AddTransactionState extends State<AddTransaction> {
                   });
                 },
               ),
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
 
               DropdownButtonFormField<String>(
                 value: _selectedCategory,
                 decoration: InputDecoration(
                   labelText: 'Category',
-                  labelStyle: TextStyle(fontSize: 16),
+                  labelStyle: const TextStyle(fontSize: 16),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  suffixIcon: Icon(Icons.category),
+                  suffixIcon: const Icon(Icons.category),
                 ),
                 items: (_selectedType == 'income' ? incomeCategories : expenseCategories)
                     .map<DropdownMenuItem<String>>((category) {
                   return DropdownMenuItem<String>(
                     value: category['id'].toString(),
-                    child: Text(category['name'], style: TextStyle(fontSize: 16)),
+                    child: Text(category['name'], style: const TextStyle(fontSize: 16)),
                   );
                 }).toList(),
                 onChanged: (String? newValue) {
@@ -250,33 +258,33 @@ class _AddTransactionState extends State<AddTransaction> {
                   });
                 },
               ),
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
 
               TextFormField(
                 controller: _dateController,
                 readOnly: true,
                 decoration: InputDecoration(
                   labelText: 'Transaction Date',
-                  labelStyle: TextStyle(fontSize: 16),
+                  labelStyle: const TextStyle(fontSize: 16),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  suffixIcon: Icon(Icons.calendar_today),
+                  suffixIcon: const Icon(Icons.calendar_today),
                 ),
-                style: TextStyle(fontSize: 16),
+                style: const TextStyle(fontSize: 16),
                 onTap: () => _selectDate(context),
               ),
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
 
               TextFormField(
                 controller: _noteController,
                 decoration: InputDecoration(
                   labelText: 'Note',
-                  labelStyle: TextStyle(fontSize: 16),
+                  labelStyle: const TextStyle(fontSize: 16),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                style: TextStyle(fontSize: 16),
+                style: const TextStyle(fontSize: 16),
                 maxLines: 3,
               ),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
 
               SizedBox(
                 width: double.infinity,
@@ -285,9 +293,9 @@ class _AddTransactionState extends State<AddTransaction> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.red,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    padding: EdgeInsets.symmetric(vertical: 14),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
-                  child: Text("Save", style: TextStyle(fontSize: 18, color: Colors.white)),
+                  child: const Text("Save", style: TextStyle(fontSize: 18, color: Colors.white)),
                 ),
               ),
             ],

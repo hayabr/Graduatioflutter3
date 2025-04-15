@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:managermoney/app/Transaction/home.dart';
-import 'package:managermoney/controller/user_controller.dart';
-import 'package:managermoney/widgets/crud.dart';
-import 'package:managermoney/connstants/linkApi.dart';
+import 'package:graduationproject/app/Transaction/home.dart';
+import 'package:graduationproject/connstants/linkApi.dart';
+import 'package:graduationproject/controller/user_controller.dart';
+import 'package:graduationproject/widgets/crud.dart';
 import 'package:intl/intl.dart'; // استيراد مكتبة intl لتنسيق التاريخ
 
 class UpdateTransaction extends StatefulWidget {
   final Map<String, dynamic> transaction;
 
-  UpdateTransaction({required this.transaction});
+  const UpdateTransaction({super.key, required this.transaction});
 
   @override
   _UpdateTransactionState createState() => _UpdateTransactionState();
@@ -122,7 +122,7 @@ class _UpdateTransactionState extends State<UpdateTransaction> {
 
         if (response != null && response['status'] == "success") {
           Get.snackbar("Success", "Transaction updated successfully");
-          Get.offAll(Home());
+          Get.offAll(const Home());
         } else {
           Get.snackbar("Error", "Failed to update transaction");
         }
@@ -135,16 +135,16 @@ class _UpdateTransactionState extends State<UpdateTransaction> {
   Future<void> _deleteTransaction() async {
     bool confirmDelete = await Get.dialog(
       AlertDialog(
-        title: Text("Confirm Delete"),
-        content: Text("Are you sure you want to delete this transaction?"),
+        title: const Text("Confirm Delete"),
+        content: const Text("Are you sure you want to delete this transaction?"),
         actions: [
           TextButton(
             onPressed: () => Get.back(result: false),
-            child: Text("Cancel"),
+            child: const Text("Cancel"),
           ),
           TextButton(
             onPressed: () => Get.back(result: true),
-            child: Text("Delete"),
+            child: const Text("Delete"),
           ),
         ],
       ),
@@ -160,7 +160,7 @@ class _UpdateTransactionState extends State<UpdateTransaction> {
 
         if (response != null && response['status'] == "success") {
           Get.snackbar("Success", "Transaction deleted successfully");
-          Get.offAll(Home());
+          Get.offAll(const Home());
         } else {
           Get.snackbar("Error", "Failed to delete transaction");
         }
@@ -174,10 +174,10 @@ class _UpdateTransactionState extends State<UpdateTransaction> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Transaction Info"),
+        title: const Text("Transaction Info"),
         actions: [
           IconButton(
-            icon: Icon(Icons.delete), // أيقونة الحذف
+            icon: const Icon(Icons.delete), // أيقونة الحذف
             onPressed: _deleteTransaction, // دالة الحذف
           ),
         ],
@@ -193,13 +193,13 @@ class _UpdateTransactionState extends State<UpdateTransaction> {
                 value: _selectedAccount.isNotEmpty ? _selectedAccount : null,
                 decoration: InputDecoration(
                   labelText: 'Account',
-                  labelStyle: TextStyle(fontSize: 16),
+                  labelStyle: const TextStyle(fontSize: 16),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                 ),
                 items: userAccounts.map<DropdownMenuItem<String>>((account) {
                   return DropdownMenuItem<String>(
                     value: account['id'].toString(),
-                    child: Text(account['name'], style: TextStyle(fontSize: 16)),
+                    child: Text(account['name'], style: const TextStyle(fontSize: 16)),
                   );
                 }).toList(),
                 onChanged: (String? newValue) {
@@ -208,15 +208,15 @@ class _UpdateTransactionState extends State<UpdateTransaction> {
                   });
                 },
               ),
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
               TextFormField(
                 controller: _amountController,
                 decoration: InputDecoration(
                   labelText: 'Amount',
-                  labelStyle: TextStyle(fontSize: 16),
+                  labelStyle: const TextStyle(fontSize: 16),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                style: TextStyle(fontSize: 16),
+                style: const TextStyle(fontSize: 16),
                 keyboardType: TextInputType.number,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -225,15 +225,15 @@ class _UpdateTransactionState extends State<UpdateTransaction> {
                   return null;
                 },
               ),
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
               DropdownButtonFormField<String>(
                 value: _selectedType,
                 decoration: InputDecoration(
                   labelText: 'Transaction Type',
-                  labelStyle: TextStyle(fontSize: 16),
+                  labelStyle: const TextStyle(fontSize: 16),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                items: [
+                items: const [
                   DropdownMenuItem(value: 'income', child: Text('Income', style: TextStyle(fontSize: 16))),
                   DropdownMenuItem(value: 'expenses', child: Text('Expense', style: TextStyle(fontSize: 16))),
                 ],
@@ -244,21 +244,21 @@ class _UpdateTransactionState extends State<UpdateTransaction> {
                   });
                 },
               ),
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
               // Category dropdown
               DropdownButtonFormField<String>(
                 value: _selectedCategory.isNotEmpty ? _selectedCategory : null,
                 decoration: InputDecoration(
                   labelText: 'Category',
-                  labelStyle: TextStyle(fontSize: 16),
+                  labelStyle: const TextStyle(fontSize: 16),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  suffixIcon: Icon(Icons.category),
+                  suffixIcon: const Icon(Icons.category),
                 ),
                 items: (_selectedType == 'income' ? incomeCategories : expenseCategories)
                     .map<DropdownMenuItem<String>>((category) {
                   return DropdownMenuItem<String>(
                     value: category['id'].toString(),
-                    child: Text(category['name'], style: TextStyle(fontSize: 16)),
+                    child: Text(category['name'], style: const TextStyle(fontSize: 16)),
                   );
                 }).toList(),
                 onChanged: (String? newValue) {
@@ -267,31 +267,31 @@ class _UpdateTransactionState extends State<UpdateTransaction> {
                   });
                 },
               ),
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
               TextFormField(
                 controller: _dateController,
                 readOnly: true,
                 decoration: InputDecoration(
                   labelText: 'Transaction Date',
-                  labelStyle: TextStyle(fontSize: 16),
+                  labelStyle: const TextStyle(fontSize: 16),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  suffixIcon: Icon(Icons.calendar_today),
+                  suffixIcon: const Icon(Icons.calendar_today),
                 ),
-                style: TextStyle(fontSize: 16),
+                style: const TextStyle(fontSize: 16),
                 onTap: () => _selectDate(context),
               ),
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
               TextFormField(
                 controller: _noteController,
                 decoration: InputDecoration(
                   labelText: 'Note',
-                  labelStyle: TextStyle(fontSize: 16),
+                  labelStyle: const TextStyle(fontSize: 16),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                style: TextStyle(fontSize: 16),
+                style: const TextStyle(fontSize: 16),
                 maxLines: 3,
               ),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -299,9 +299,9 @@ class _UpdateTransactionState extends State<UpdateTransaction> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.red,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    padding: EdgeInsets.symmetric(vertical: 14),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
-                  child: Text("Update", style: TextStyle(fontSize: 18, color: Colors.white)),
+                  child: const Text("Update", style: TextStyle(fontSize: 18, color: Colors.white)),
                 ),
               ),
             ],

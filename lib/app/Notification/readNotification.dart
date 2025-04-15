@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:graduationproject/app/Notification/globalVariable.dart';
+import 'package:graduationproject/connstants/linkApi.dart';
+import 'package:graduationproject/controller/user_controller.dart';
+import 'package:graduationproject/widgets/BottomNavBar.dart';
 import 'package:http/http.dart' as http;
-import 'package:managermoney/app/Notification/globalVariable.dart';
 import 'dart:convert';
-import 'package:managermoney/connstants/linkApi.dart';
-import 'package:managermoney/controller/user_controller.dart';
-import 'package:managermoney/widgets/BottomNavBar.dart';
-// استيراد المتغيرات العامة
+
 
 class NotificationsPage extends StatefulWidget {
-  const NotificationsPage({Key? key}) : super(key: key);
+  const NotificationsPage({super.key});
 
   @override
   _NotificationsPageState createState() => _NotificationsPageState();
@@ -31,7 +31,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
       final String userId = userController.userId.value;
 
       final response = await http.post(
-        Uri.parse('$linkViewNotification'),
+        Uri.parse(linkViewNotification),
         body: {"user_id": userId},
       );
 
@@ -40,16 +40,30 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
         if (data is Map<String, dynamic> && data["status"] == "success") {
           final List<dynamic> rawNotifications = data["notifications"] ?? [];
-          
-          // حساب الإشعارات غير المقروءة
-          int unreadCount = rawNotifications.where((n) => 
-            (n["is_read"]?.toString() ?? "0") == "0").length;
-          
-          // تحديث المتغير العام
+
+          int unreadCount = rawNotifications
+              .where((n) => (n["is_read"]?.toString() ?? "0") == "0")
+              .length;
+
           NotificationGlobals.updateUnreadCount(unreadCount);
-          
+
+          // تحقق من وجود إشعار واحد فقط عند تجاوز الميزانية
+          bool budgetExceededNotified = false;
+
+          for (var notification in rawNotifications) {
+            // إذا كانت الإشعار من نوع "budget_exceeded" ولم يتم تنبيه المستخدم بعد
+            if (notification["type"] == "budget_exceeded" && !budgetExceededNotified) {
+              // حدد تنبيه واحد فقط عند تجاوز الميزانية
+              Future.delayed(Duration.zero, () {
+                showBudgetExceededDialog(context, notification["message"] ?? "تم تجاوز الميزانية!");
+              });
+              budgetExceededNotified = true; // تأكد من أن الإشعار يظهر مرة واحدة فقط
+            }
+          }
+
           setState(() {
-            notifications = rawNotifications.map((e) => Map<String, dynamic>.from(e)).toList();
+            notifications =
+                rawNotifications.map((e) => Map<String, dynamic>.from(e)).toList();
           });
         }
       }
@@ -64,15 +78,53 @@ class _NotificationsPageState extends State<NotificationsPage> {
     });
   }
 
+  // دالة عرض الـ Dialog عند تجاوز الميزانية
+  void showBudgetExceededDialog(BuildContext context, String message) {
+    showDialog(
+      context: context,
+      barrierDismissible: false, // المستخدم يجب أن يغلقه يدويًا
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.warning, size: 50, color: Colors.red),
+                const SizedBox(height: 10),
+                const Text(
+                  "تحذير: تجاوزت الميزانية!",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 16),
+                ),
+                const SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("إغلاق"),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Notifications"),
+        title: const Text("Notifications"),
         backgroundColor: Colors.white,
       ),
       body: notifications.isEmpty
-          ? Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator())
           : ListView.builder(
               itemCount: notifications.length,
               itemBuilder: (context, index) {

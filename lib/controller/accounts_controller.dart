@@ -8,7 +8,7 @@ class AccountsController extends GetxController {
   // دالة لجلب البيانات (مثال)
   void fetchAccounts() async {
     isLoading(true); // بدء التحميل
-    await Future.delayed(Duration(seconds: 2)); // محاكاة طلب شبكة
+    await Future.delayed(const Duration(seconds: 2)); // محاكاة طلب شبكة
     accountsList.addAll(['Account 1', 'Account 2', 'Account 3']); // إضافة بيانات وهمية
     isLoading(false); // إيقاف التحميل
   }

@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:managermoney/app/Notification/globalVariable.dart';
-import 'package:managermoney/app/Transaction/addTransaction.dart';
-import 'package:managermoney/widgets/BottomNavBar.dart';
-import 'package:managermoney/controller/user_controller.dart';
+import 'package:graduationproject/app/Budgets/budget.dart';
+import 'package:graduationproject/app/Notification/globalVariable.dart';
+import 'package:graduationproject/app/Notification/readNotification.dart';
+import 'package:graduationproject/app/Transaction/addTransaction.dart';
+import 'package:graduationproject/controller/user_controller.dart';
+import 'package:graduationproject/widgets/BottomNavBar.dart';
+import 'package:graduationproject/widgets/widgetTransactions/summaryBox.dart';
+import 'package:graduationproject/widgets/widgetTransactions/transaction_list.dart';
 import 'package:get/get.dart';
-import 'package:managermoney/widgets/widgetTransactions/summaryBox.dart';
-import 'package:managermoney/widgets/widgetTransactions/transaction_list.dart';
-import 'package:managermoney/app/Notification/readNotification.dart';
+
 
 class Home extends StatefulWidget {
-  const Home({Key? key}) : super(key: key);
+  const Home({super.key});
 
   @override
   HomeState createState() => HomeState();
@@ -18,7 +20,8 @@ class Home extends StatefulWidget {
 class HomeState extends State<Home> {
   int _selectedIndex = 0;
   final UserController userController = Get.find<UserController>();
-  bool showNotificationBadge = true; // متغير للتحكم في ظهور العداد
+  bool showNotificationBadge = true;
+  final int _selectedTabIndex = 0;
 
   void _onItemTapped(int index) {
     setState(() {
@@ -28,10 +31,9 @@ class HomeState extends State<Home> {
 
   Future<void> _navigateToNotificationsScreen(BuildContext context) async {
     setState(() {
-      showNotificationBadge = false; // إخفاء العداد
+      showNotificationBadge = false;
     });
 
-    // تحديث حالة القراءة في الخلفية
     NotificationGlobals.updateUnreadCount(0);
 
     await Navigator.push(
@@ -56,23 +58,26 @@ class HomeState extends State<Home> {
         backgroundColor: Colors.white,
         elevation: 0,
         automaticallyImplyLeading: false,
-        title: const Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            "Money Manager",
-            style: TextStyle(fontSize: 22, color: Colors.black, fontWeight: FontWeight.bold),
-          ),
+        title: const Text(
+          "Money Manager",
+          style: TextStyle(fontSize: 22, color: Colors.black, fontWeight: FontWeight.bold),
         ),
         actions: [
+          // استبدال أيقونة البحث بأيقونة "Set Budget"
           IconButton(
-            icon: const Icon(Icons.search, color: Colors.black),
-            onPressed: () {},
+            icon: const Icon(Icons.pie_chart, color: Colors.black), // أيقونة "Set Budget"
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const BudgetPage()),
+              );
+            },
           ),
           IconButton(
             icon: Obx(() => Stack(
               children: [
                 Transform.scale(
-                  scale: 1.3, // تكبير الأيقونة
+                  scale: 1.3,
                   child: const Icon(Icons.notifications_none, color: Colors.black),
                 ),
                 if (showNotificationBadge && NotificationGlobals.unreadNotificationsCount.value > 0)
@@ -102,12 +107,9 @@ class HomeState extends State<Home> {
             )),
             onPressed: () {
               setState(() {
-                // عند الضغط على الأيقونة، إخفاء العداد وتحديثه ليصبح صفرًا
-                NotificationGlobals.updateUnreadCount(0); 
-                showNotificationBadge = false; // إخفاء العداد
+                NotificationGlobals.updateUnreadCount(0);
+                showNotificationBadge = false;
               });
-
-              // الانتقال إلى صفحة الإشعارات
               _navigateToNotificationsScreen(context);
             },
           ),
@@ -116,65 +118,25 @@ class HomeState extends State<Home> {
       body: SafeArea(
         child: Column(
           children: [
+            const Divider(thickness: 1, height: 1, color: Colors.grey),
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 12.0),
+              child: Column(
+                children: [
+                  SummaryRow(),
+                ],
+              ),
+            ),
+            const Divider(thickness: 1, height: 1, color: Colors.grey),
             Expanded(
               child: CustomScrollView(
                 slivers: [
-                  const SliverToBoxAdapter(
-                    child: Divider(
-                      thickness: 1,
-                      height: 1,
-                      color: Colors.grey,
-                    ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: Container(
-                      color: Colors.white,
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        children: [
-                          SummaryRow(),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SliverToBoxAdapter(
-                    child: Divider(thickness: 1, height: 1, color: Colors.grey),
-                  ),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: const [
-                          Text(
-                            'Transaction History',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 20,
-                              color: Colors.black,
-                            ),
-                          ),
-                          Text(
-                            'See All',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 15,
-                              color: Colors.grey,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
                   SliverToBoxAdapter(
                     child: TransactionCard(userId: userId),
                   ),
                 ],
               ),
-            ),
-            Container(
-              height: 20,
-              color: Colors.white,
             ),
           ],
         ),
@@ -187,7 +149,7 @@ class HomeState extends State<Home> {
         onPressed: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) =>  AddTransaction()),
+            MaterialPageRoute(builder: (context) => AddTransaction()),
           );
         },
         backgroundColor: Colors.red,

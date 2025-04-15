@@ -1,9 +1,9 @@
-import 'package:managermoney/connstants/message.dart';
+import 'package:graduationproject/connstants/message.dart';
 
 
 String? validInput(String val, int min, int max) {
   if (val.isEmpty) {
-    return "$messageInputEmpty"; // 🟢 التحقق أولًا من أن الحقل ليس فارغًا
+    return messageInputEmpty; // 🟢 التحقق أولًا من أن الحقل ليس فارغًا
   }
   if (val.length < min) {
     return "$messageInputMin $min"; // 🟢 التحقق من الحد الأدنى

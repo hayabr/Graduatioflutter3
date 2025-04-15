@@ -28,4 +28,12 @@ const String linkGetCategory ="$linkServerName/Statistics/getCategory.php";
 const String linkViewNotification ="$linkServerName/Notification/readNotif.php";
 const String linkinsertNotification ="$linkServerName/Notification/addNoti.php";
 const String linkMarkNotificationsRead ="$linkServerName/Notification/markNotificationasRead.php";
+//Budget
+const String linkaddBudget ="$linkServerName/budget/addBudget.php";
+const String linkDeleteBudget ="$linkServerName/budget/DeleteBudget.php";
+const String linkEditBudget ="$linkServerName/budget/editBudget.php";
+const String linkReadBudget ="$linkServerName/budget/ReadBudget.php";
 
+//Recomendation 
+
+const String  stocksRecommendation ="$linkServerName/investment/investstocks2.php";

@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:managermoney/app/Transaction/editTransation.dart';
-import 'package:managermoney/connstants/linkApi.dart';
-import 'package:managermoney/controller/user_controller.dart';
+import 'package:graduationproject/app/Transaction/editTransation.dart';
+import 'package:graduationproject/connstants/linkApi.dart';
+import 'package:graduationproject/widgets/crud.dart';
 import 'package:get/get.dart';
-import 'package:managermoney/widgets/crud.dart';
+
 
 class TransactionCard extends StatelessWidget {
   final String userId;
   final Crud crud = Crud();
 
   TransactionCard({
-    Key? key,
+    super.key,
     required this.userId,
-  }) : super(key: key);
+  });
 
   Future<dynamic> getTransactions() async {
     try {
@@ -84,11 +84,11 @@ class TransactionCard extends StatelessWidget {
       future: getTransactions(),
       builder: (BuildContext context, AsyncSnapshot snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(child: CircularProgressIndicator());
+          return const Center(child: CircularProgressIndicator());
         } else if (snapshot.hasError) {
           return Center(child: Text("Error: ${snapshot.error}"));
         } else if (!snapshot.hasData || snapshot.data.isEmpty) {
-          return Center(child: Text("No transactions found"));
+          return const Center(child: Text("No transactions found"));
         } else if (snapshot.hasData) {
           var transactions = snapshot.data;
 
@@ -98,7 +98,7 @@ class TransactionCard extends StatelessWidget {
           return SingleChildScrollView(
             child: ListView.builder(
               shrinkWrap: true,
-              physics: ClampingScrollPhysics(),
+              physics: const ClampingScrollPhysics(),
               itemCount: groupedTransactions.length,
               itemBuilder: (context, index) {
                 var date = groupedTransactions.keys.elementAt(index);
@@ -180,7 +180,7 @@ class TransactionCard extends StatelessWidget {
                                 ),
                               ),
                             );
-                          }).toList(),
+                          }),
                         ],
                       ),
                     ),

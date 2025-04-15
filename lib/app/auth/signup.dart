@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:graduationproject/connstants/linkApi.dart';
+import 'package:graduationproject/widgets/crud.dart';
+import 'package:graduationproject/widgets/customtextform.dart';
+import 'package:graduationproject/widgets/valid.dart';
 
-import 'package:managermoney/connstants/linkApi.dart';
-import 'package:managermoney/widgets/crud.dart';
-import 'package:managermoney/widgets/customtextform.dart';
-import 'package:managermoney/widgets/valid.dart';
 
 class Signup extends StatefulWidget {
   const Signup({super.key});
@@ -15,7 +15,7 @@ class Signup extends StatefulWidget {
 class _SignUpState extends State<Signup> {
   GlobalKey <FormState> formstate= GlobalKey();
   
-  Crud _crud = Crud();
+  final Crud _crud = Crud();
   final TextEditingController email = TextEditingController();
   final TextEditingController password = TextEditingController();
   final TextEditingController username = TextEditingController();

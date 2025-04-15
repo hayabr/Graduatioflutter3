@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:managermoney/app/Accounts/addAccounts.dart';
-import 'package:managermoney/connstants/linkApi.dart';
-import 'package:managermoney/controller/user_controller.dart';
 import 'package:get/get.dart';
-import 'package:managermoney/widgets/BottomNavBar.dart';
-import 'package:managermoney/widgets/Widgets%20Accounts/accountSummary.dart';
-import 'package:managermoney/widgets/Widgets%20Accounts/account_list.dart';
+import 'package:graduationproject/app/Accounts/addAccounts.dart';
+import 'package:graduationproject/widgets/BottomNavBar.dart';
+import 'package:graduationproject/widgets/Widgets%20Accounts/accountSummary.dart';
+import 'package:graduationproject/widgets/Widgets%20Accounts/account_list.dart';
+
 
 class Accounts extends StatefulWidget {
   const Accounts({super.key});
@@ -30,7 +29,7 @@ class _AccountsState extends State<Accounts> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
-        leading: SizedBox.shrink(),
+        leading: const SizedBox.shrink(),
         flexibleSpace: Align(
           alignment: Alignment.centerLeft,
           child: Padding(
@@ -38,7 +37,7 @@ class _AccountsState extends State<Accounts> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
+                const Text(
                   'Accounts',
                   style: TextStyle(fontSize: 20),
                 ),
@@ -63,12 +62,12 @@ class _AccountsState extends State<Accounts> {
                         }
                       },
                       itemBuilder: (BuildContext context) => [
-                        PopupMenuItem(value: "Add", child: Text("Add", style: TextStyle(fontSize: 18))),
+                        const PopupMenuItem(value: "Add", child: Text("Add", style: TextStyle(fontSize: 18))),
                       //  PopupMenuItem(value: "Delete", child: Text("Delete", style: TextStyle(fontSize: 18))),
                       //  PopupMenuItem(value: "Modify Account", child: Text("Modify Account", style: TextStyle(fontSize: 18))),
                       ],
-                      icon: Icon(Icons.more_vert),
-                      offset: Offset(0, 40),
+                      icon: const Icon(Icons.more_vert),
+                      offset: const Offset(0, 40),
                     ),
                   ),
                 ),
@@ -79,7 +78,7 @@ class _AccountsState extends State<Accounts> {
       ),
       body: Column(
         children: [
-          Divider(),
+          const Divider(),
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: Row(
@@ -89,7 +88,7 @@ class _AccountsState extends State<Accounts> {
               ],
             ),
           ),
-          Divider(),
+          const Divider(),
           Expanded(
             child: AccountsList(), // عرض قائمة الحسابات
           ),
@@ -112,7 +111,7 @@ class _AccountsState extends State<Accounts> {
         ),
         Text(
           value,
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
       ],
     );

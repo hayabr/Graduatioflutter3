@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:managermoney/app/Accounts/accounts.dart';
-import 'package:managermoney/controller/user_controller.dart';
-import 'package:managermoney/widgets/crud.dart';
-import 'package:managermoney/connstants/linkApi.dart';
+import 'package:graduationproject/app/Accounts/accounts.dart';
+import 'package:graduationproject/connstants/linkApi.dart';
+import 'package:graduationproject/controller/user_controller.dart';
+import 'package:graduationproject/widgets/crud.dart';
+
 
 class UpdateAccount extends StatefulWidget {
   final Map<String, dynamic> accountData;
 
-  UpdateAccount({required this.accountData});
+  const UpdateAccount({super.key, required this.accountData});
 
   @override
   _UpdateAccountState createState() => _UpdateAccountState();
@@ -53,7 +54,7 @@ class _UpdateAccountState extends State<UpdateAccount> {
 
         if (response != null && response['status'] == "success") {
           Get.snackbar("Success", "Account updated successfully");
-          Get.offAll(Accounts()); // Navigate to Accounts page after updating
+          Get.offAll(const Accounts()); // Navigate to Accounts page after updating
         } else {
           Get.snackbar("Error", "Failed to update account");
         }
@@ -69,16 +70,16 @@ class _UpdateAccountState extends State<UpdateAccount> {
     bool confirmDelete = await showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text("Delete Account"),
-        content: Text("Are you sure you want to delete this account?"),
+        title: const Text("Delete Account"),
+        content: const Text("Are you sure you want to delete this account?"),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: Text("Cancel"),
+            child: const Text("Cancel"),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: Text("Delete", style: TextStyle(color: Colors.red)),
+            child: const Text("Delete", style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -96,13 +97,13 @@ class _UpdateAccountState extends State<UpdateAccount> {
 
         if (response != null && response['status'] == "success") {
           Get.snackbar("Success", "Account deleted successfully");
-          Get.offAll(Accounts()); // Navigate to Accounts page after deleting
+          Get.offAll(const Accounts()); // Navigate to Accounts page after deleting
         } else if (response != null && response['status'] == "error" && response['message'] == "الحساب مرتبط بمعاملة ولا يمكن حذفه إلا بعد حذف المعاملة المرتبطة به") {
           // إذا كان الحساب مرتبطًا بمعاملة
           Get.snackbar(
             "Error",
             "This account cannot be deleted because it is linked to one or more transactions. To delete this account, please first delete all associated transactions from the transactions section.",
-            duration: Duration(seconds: 7), // زيادة مدة عرض الرسالة
+            duration: const Duration(seconds: 7), // زيادة مدة عرض الرسالة
             snackPosition: SnackPosition.TOP, // عرض الرسالة في الأعلى
             backgroundColor: Colors.red, // لون الخلفية
             colorText: Colors.white, // لون النص
@@ -121,7 +122,7 @@ class _UpdateAccountState extends State<UpdateAccount> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Row(
+        title: const Row(
           mainAxisAlignment: MainAxisAlignment.start,
           children: [
             Text("Account Info"),
@@ -129,7 +130,7 @@ class _UpdateAccountState extends State<UpdateAccount> {
         ),
         actions: [
           Padding(
-            padding: EdgeInsets.only(right: 13.0),
+            padding: const EdgeInsets.only(right: 13.0),
             child: IconButton(
               icon: Icon(Icons.delete, color: Colors.grey[800]),
               iconSize: 30,
@@ -152,7 +153,7 @@ class _UpdateAccountState extends State<UpdateAccount> {
                   value: _selectedGroup,
                   decoration: InputDecoration(
                     labelText: 'Group',
-                    labelStyle: TextStyle(color: Colors.red, fontSize: 16, fontWeight: FontWeight.bold),
+                    labelStyle: const TextStyle(color: Colors.red, fontSize: 16, fontWeight: FontWeight.bold),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                   items: <String>[
@@ -185,14 +186,14 @@ class _UpdateAccountState extends State<UpdateAccount> {
                     });
                   },
                 ),
-                SizedBox(height: 10),
+                const SizedBox(height: 10),
 
                 // Dropdown for Classification
                 DropdownButtonFormField<String>(
                   value: _selectedClassification,
                   decoration: InputDecoration(
                     labelText: 'Classification',
-                    labelStyle: TextStyle(color: Colors.red, fontSize: 16, fontWeight: FontWeight.bold),
+                    labelStyle: const TextStyle(color: Colors.red, fontSize: 16, fontWeight: FontWeight.bold),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                   items: <String>['Assets', 'Liabilities']
@@ -208,7 +209,7 @@ class _UpdateAccountState extends State<UpdateAccount> {
                     });
                   },
                 ),
-                SizedBox(height: 10),
+                const SizedBox(height: 10),
 
                 // Account Name Field
                 TextFormField(
@@ -224,7 +225,7 @@ class _UpdateAccountState extends State<UpdateAccount> {
                     return null;
                   },
                 ),
-                SizedBox(height: 10),
+                const SizedBox(height: 10),
 
                 // Amount Field
                 TextFormField(
@@ -241,7 +242,7 @@ class _UpdateAccountState extends State<UpdateAccount> {
                     return null;
                   },
                 ),
-                SizedBox(height: 10),
+                const SizedBox(height: 10),
 
                 // Description Field
                 TextFormField(
@@ -252,7 +253,7 @@ class _UpdateAccountState extends State<UpdateAccount> {
                   ),
                   maxLines: 4, // Make the description field larger
                 ),
-                SizedBox(height: 20),
+                const SizedBox(height: 20),
 
                 // Update Button
                 SizedBox(
@@ -262,9 +263,9 @@ class _UpdateAccountState extends State<UpdateAccount> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.red, // Change button color to red
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      padding: EdgeInsets.symmetric(vertical: 14),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
-                    child: Text("Update", style: TextStyle(fontSize: 18, color: Colors.white)),
+                    child: const Text("Update", style: TextStyle(fontSize: 18, color: Colors.white)),
                   ),
                 ),
               ],

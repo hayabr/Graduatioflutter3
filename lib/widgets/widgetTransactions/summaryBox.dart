@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:managermoney/connstants/linkApi.dart';
-import 'package:managermoney/controller/user_controller.dart';
+import 'package:graduationproject/connstants/linkApi.dart';
+import 'package:graduationproject/controller/user_controller.dart';
+import 'package:graduationproject/widgets/crud.dart';
 import 'package:get/get.dart';
-import 'package:managermoney/widgets/crud.dart';
+
 
 class SummaryRow extends StatelessWidget {
   final Crud crud = Crud();
   final UserController userController = Get.find<UserController>();
+
+  SummaryRow({super.key});
 
   Future<dynamic> getSummaryData() async {
     String userId = userController.getUserId();
@@ -59,7 +62,7 @@ class SummaryRow extends StatelessWidget {
       future: getSummaryData(),
       builder: (BuildContext context, AsyncSnapshot snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(child: CircularProgressIndicator());
+          return const Center(child: CircularProgressIndicator());
         } else if (snapshot.hasError) {
           return Center(child: Text("Error: ${snapshot.error}"));
         } 

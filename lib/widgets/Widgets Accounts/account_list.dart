@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:managermoney/app/Accounts/editAccounts.dart';
-import 'package:managermoney/connstants/linkApi.dart';
-import 'package:managermoney/controller/user_controller.dart';
+import 'package:graduationproject/app/Accounts/editAccounts.dart';
+import 'package:graduationproject/connstants/linkApi.dart';
+import 'package:graduationproject/controller/user_controller.dart';
+import 'package:graduationproject/widgets/crud.dart';
 import 'package:get/get.dart';
-import 'package:managermoney/widgets/crud.dart';
 
 class AccountsList extends StatelessWidget {
   final Crud crud = Crud();
   final UserController userController = Get.find<UserController>();
+
+  AccountsList({super.key});
 
   Future<dynamic> getAccounts() async {
     String userId = userController.getUserId();
@@ -36,11 +38,11 @@ class AccountsList extends StatelessWidget {
       future: getAccounts(),
       builder: (BuildContext context, AsyncSnapshot snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(child: CircularProgressIndicator());
+          return const Center(child: CircularProgressIndicator());
         } else if (snapshot.hasError) {
           return Center(child: Text("Error: ${snapshot.error}"));
         } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return Center(child: Text("No accounts found"));
+          return const Center(child: Text("No accounts found"));
         } else if (snapshot.hasData) {
           var data = snapshot.data['data'];
           if (data is List) {
@@ -59,7 +61,7 @@ class AccountsList extends StatelessWidget {
             return ListView.builder(
               itemCount: groupedData.length,
               shrinkWrap: true,
-              physics: ClampingScrollPhysics(),
+              physics: const ClampingScrollPhysics(),
               itemBuilder: (context, index) {
                 var group = groupedData.keys.elementAt(index);
                 var accounts = groupedData[group]!;
@@ -85,7 +87,7 @@ class AccountsList extends StatelessWidget {
                       ListView.builder(
                         itemCount: accounts.length,
                         shrinkWrap: true,
-                        physics: NeverScrollableScrollPhysics(),
+                        physics: const NeverScrollableScrollPhysics(),
                         itemBuilder: (context, i) {
                           var account = accounts[i];
                           var name = account['name'] ?? "No Name";
@@ -114,7 +116,7 @@ class AccountsList extends StatelessWidget {
                                 children: [
                                   Text(
                                     name,
-                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                                   ),
                                   Text(
                                     amount,
@@ -122,7 +124,7 @@ class AccountsList extends StatelessWidget {
                                   ),
                                 ],
                               ),
-                              trailing: Icon(Icons.edit, color: Colors.grey),
+                              trailing: const Icon(Icons.edit, color: Colors.grey),
                               onTap: () {
                                 Get.to(UpdateAccount(accountData: account));
                               },
@@ -130,7 +132,7 @@ class AccountsList extends StatelessWidget {
                           );
                         },
                       ),
-                      Divider(
+                      const Divider(
                         height: 1,
                         thickness: 1,
                       ),
@@ -140,7 +142,7 @@ class AccountsList extends StatelessWidget {
               },
             );
           } else {
-            return Center(child: Text("Invalid data format"));
+            return const Center(child: Text("Invalid data format"));
           }
         }
         return Container();
