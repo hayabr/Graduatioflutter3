@@ -1,7 +1,7 @@
 import 'package:graduationproject/connstants/message.dart';
 
 
-String? validInput(String val, int min, int max) {
+String? validInput(String val, int min, int max, String s) {
   if (val.isEmpty) {
     return messageInputEmpty; // 🟢 التحقق أولًا من أن الحقل ليس فارغًا
   }

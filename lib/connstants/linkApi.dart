@@ -34,6 +34,8 @@ const String linkDeleteBudget ="$linkServerName/budget/DeleteBudget.php";
 const String linkEditBudget ="$linkServerName/budget/editBudget.php";
 const String linkReadBudget ="$linkServerName/budget/ReadBudget.php";
 
-//Recomendation 
+//users 
 
-const String  stocksRecommendation ="$linkServerName/investment/investstocks2.php";
+const String  linkuser ="$linkServerName/usres/getuser.php";
+const String  linkedituser ="$linkServerName/usres/edituser.php";
+

@@ -1,188 +1,278 @@
 import 'package:flutter/material.dart';
+import 'package:fl_chart/fl_chart.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'package:graduationproject/app/Recommendation/CommoditiesRecommendation.dart';
 
-class CommodityDetailsPage extends StatelessWidget {
+class CommodityPricePoint {
+  final DateTime date;
+  final double price;
+
+  CommodityPricePoint({required this.date, required this.price});
+}
+
+class CommodityMACDPoint {
+  final int index;
+  final double macdLine;
+  final double signalLine;
+  final double histogram;
+
+  CommodityMACDPoint({
+    required this.index,
+    required this.macdLine,
+    required this.signalLine,
+    required this.histogram,
+  });
+}
+
+class CommodityDetailsPage extends StatefulWidget {
   final CommodityRecommendation commodity;
 
   const CommodityDetailsPage({super.key, required this.commodity});
 
   @override
+  _CommodityDetailsPageState createState() => _CommodityDetailsPageState();
+}
+
+class _CommodityDetailsPageState extends State<CommodityDetailsPage> {
+  List<CommodityPricePoint> priceHistory = [];
+  List<CommodityMACDPoint> macdHistory = [];
+  bool isLoading = true;
+  double fallbackSupport = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    fetchPriceHistory();
+  }
+
+  Future<void> fetchPriceHistory() async {
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      String symbol = widget.commodity.symbol;
+      final response = await http.get(
+        Uri.parse(
+          'https://query1.finance.yahoo.com/v8/finance/chart/$symbol?range=3mo&interval=1d',
+        ),
+        headers: {'User-Agent': 'Mozilla/5.0'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final result = data['chart']['result'][0];
+        final timestamps = result['timestamp'] as List<dynamic>;
+        final closes = result['indicators']['quote'][0]['close'] as List<dynamic>;
+        final lows = result['indicators']['quote'][0]['low'] as List<dynamic>;
+
+        final List<CommodityPricePoint> points = [];
+        final List<double> validCloses = [];
+        final List<double> validLows = [];
+
+        // جمع البيانات الصالحة
+        for (int i = 0; i < timestamps.length; i++) {
+          if (closes[i] != null && lows[i] != null) {
+            points.add(CommodityPricePoint(
+              date: DateTime.fromMillisecondsSinceEpoch(timestamps[i] * 1000),
+              price: closes[i].toDouble(),
+            ));
+            validCloses.add(closes[i].toDouble());
+            validLows.add(lows[i].toDouble());
+          }
+        }
+
+        // التأكد من وجود بيانات كافية
+        if (validCloses.length < 26) {
+          print('Not enough data for MACD: ${validCloses.length} points');
+          setState(() {
+            priceHistory = points;
+            macdHistory = [];
+            fallbackSupport = validLows.isNotEmpty
+                ? validLows.reduce((a, b) => a < b ? a : b)
+                : widget.commodity.support;
+            isLoading = false;
+          });
+          return;
+        }
+
+        // حساب MACD
+        final macdData = _calculateMACD(validCloses);
+        final macdPoints = <CommodityMACDPoint>[];
+        final macdLine = macdData['macdLine']!;
+        final signalLine = macdData['signalLine']!;
+        for (int i = 0; i < macdLine.length && i < signalLine.length; i++) {
+          macdPoints.add(CommodityMACDPoint(
+            index: i,
+            macdLine: macdLine[i],
+            signalLine: signalLine[i],
+            histogram: macdLine[i] - signalLine[i],
+          ));
+        }
+
+        setState(() {
+          priceHistory = points;
+          macdHistory = macdPoints;
+          fallbackSupport = validLows.isNotEmpty
+              ? validLows.reduce((a, b) => a < b ? a : b)
+              : widget.commodity.support;
+          isLoading = false;
+        });
+      } else {
+        print('Failed to fetch price history: ${response.statusCode}');
+        throw Exception('Failed to load price history');
+      }
+    } catch (e) {
+      print('Error loading price history: $e');
+      setState(() {
+        isLoading = false;
+        priceHistory = [];
+        macdHistory = [];
+        fallbackSupport = widget.commodity.support;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('خطأ في تحميل البيانات: $e')),
+      );
+    }
+  }
+
+  List<double> _calculateSMA(List<double> prices, int period) {
+    List<double> sma = [];
+    for (int i = period - 1; i < prices.length; i++) {
+      double sum = 0;
+      for (int j = 0; j < period; j++) {
+        sum += prices[i - j];
+      }
+      sma.add(sum / period);
+    }
+    return sma;
+  }
+
+  Map<String, List<double>> _calculateMACD(List<double> prices) {
+    List<double> calculateEMA(List<double> prices, int period) {
+      List<double> ema = [];
+      if (prices.length < period) return ema;
+      double multiplier = 2 / (period + 1);
+      ema.add(prices.sublist(0, period).reduce((a, b) => a + b) / period);
+
+      for (int i = period; i < prices.length; i++) {
+        double value = (prices[i] * multiplier) + (ema.last * (1 - multiplier));
+        ema.add(value);
+      }
+      return ema;
+    }
+
+    List<double> ema12 = calculateEMA(prices, 12);
+    List<double> ema26 = calculateEMA(prices, 26);
+
+    List<double> macdLine = [];
+    for (int i = 0; i < ema12.length && i < ema26.length; i++) {
+      macdLine.add(ema12[i] - ema26[i]);
+    }
+
+    List<double> signalLine = calculateEMA(macdLine, 9);
+
+    return {
+      'macdLine': macdLine,
+      'signalLine': signalLine,
+    };
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(commodity.title),
+        title: Text(widget.commodity.title),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.black),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header with icon and basic info
-            Row(
-              children: [
-                Icon(
-                  _getCommodityIcon(commodity.subtitle),
-                  size: 40,
-                  color: Colors.amber,
-                ),
-                const SizedBox(width: 16),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      commodity.title,
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      commodity.subtitle,
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            
-            // Recommendation chip
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: commodity.recommendationColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: commodity.recommendationColor,
-                  width: 1,
-                ),
-              ),
-              child: Text(
-                commodity.recommendation,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: commodity.recommendationColor,
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            
-            // Price information
-            const Text(
-              'معلومات السعر',
-              style: TextStyle(
-                fontSize: 20,
+            _buildHeader(),
+            const SizedBox(height: 20),
+            _buildRecommendationCard(),
+            const SizedBox(height: 20),
+            _buildPriceChart(),
+            const SizedBox(height: 20),
+            _buildMACDChart(),
+            const SizedBox(height: 20),
+            _buildInfoCard(),
+            const SizedBox(height: 20),
+            _buildConditionsSection(),
+            const SizedBox(height: 20),
+            _buildAnalysisSection(),
+            const SizedBox(height: 20),
+            _buildTradingStrategySection(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Row(
+      children: [
+        Icon(
+          _getCommodityIcon(widget.commodity.subtitle),
+          size: 40,
+          color: Colors.amber,
+        ),
+        const SizedBox(width: 16),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              widget.commodity.title,
+              style: const TextStyle(
+                fontSize: 24,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const Divider(),
-            _buildDetailRow('السعر الحالي', '\$${commodity.currentPrice.toStringAsFixed(2)}'),
-            _buildDetailRow('السعر الأول', '\$${commodity.firstPrice.toStringAsFixed(2)}'),
-            _buildDetailRow('التغير', '${commodity.changePercent.toStringAsFixed(2)}%', 
-                color: commodity.changePercent >= 0 ? Colors.green : Colors.red),
-            _buildDetailRow('المتوسط المتحرك (14 يوم)', '\$${commodity.sma.toStringAsFixed(2)}'),
-            _buildDetailRow('مؤشر القوة النسبية (RSI)', commodity.rsi.toStringAsFixed(1)),
-            const SizedBox(height: 16),
-            
-            // Volume information
-            const Text(
-              'معلومات الحجم',
+            Text(
+              widget.commodity.subtitle,
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRecommendationCard() {
+    return Card(
+      color: widget.commodity.recommendationColor.withOpacity(0.1),
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'التوصية',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[800],
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              widget.commodity.recommendation,
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
-              ),
-            ),
-            const Divider(),
-            _buildDetailRow('حجم التداول الأخير', commodity.lastVolume.toString()),
-            _buildDetailRow('متوسط الحجم', commodity.avgVolume.toString()),
-            const SizedBox(height: 16),
-            
-            // Support & Resistance
-            const Text(
-              'الدعم والمقاومة',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const Divider(),
-            _buildDetailRow('مستوى الدعم', '\$${commodity.support.toStringAsFixed(2)}'),
-            _buildDetailRow('مستوى المقاومة', '\$${commodity.resistance.toStringAsFixed(2)}'),
-            const SizedBox(height: 16),
-            
-            // Trading signals if available
-            if (commodity.entryPrice != null) ...[
-              const Text(
-                'إشارات التداول',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const Divider(),
-              _buildDetailRow('سعر الدخول المقترح', '\$${commodity.entryPrice!.toStringAsFixed(2)}'),
-              _buildDetailRow('وقف الخسارة', '\$${commodity.stopLoss!.toStringAsFixed(2)}'),
-              _buildDetailRow('جني الأرباح', '\$${commodity.takeProfit!.toStringAsFixed(2)}'),
-              const SizedBox(height: 16),
-            ],
-            
-            // Conditions
-            const Text(
-              'الشروط المحققة',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const Divider(),
-            ...commodity.conditions.map((condition) => 
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  children: [
-                    Icon(
-                      condition.contains("شراء") ? Icons.arrow_upward : Icons.arrow_downward,
-                      color: condition.contains("شراء") ? Colors.green : Colors.red,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        condition,
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: condition.contains("شراء") ? Colors.green : Colors.red,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            
-            // Analysis
-            const Text(
-              'التحليل الفني',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const Divider(),
-            ...commodity.analysis.map((item) => 
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Text(
-                  item,
-                  style: const TextStyle(fontSize: 16),
-                ),
+                color: widget.commodity.recommendationColor,
               ),
             ),
           ],
@@ -191,29 +281,613 @@ class CommodityDetailsPage extends StatelessWidget {
     );
   }
 
-  Widget _buildDetailRow(String label, String value, {Color? color}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
+  Widget _buildPriceChart() {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'سجل الأسعار',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[800],
+              ),
             ),
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 16,
-              color: color,
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 200,
+              child: isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : priceHistory.isEmpty
+                      ? const Center(child: Text('لا توجد بيانات أسعار متاحة'))
+                      : LineChart(
+                          LineChartData(
+                            gridData: const FlGridData(show: true),
+                            titlesData: FlTitlesData(
+                              leftTitles: AxisTitles(
+                                sideTitles: SideTitles(
+                                  showTitles: true,
+                                  reservedSize: 40,
+                                  getTitlesWidget: (value, meta) {
+                                    return Text(
+                                      '\$${value.toStringAsFixed(2)}',
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.grey,
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                              bottomTitles: const AxisTitles(
+                                sideTitles: SideTitles(showTitles: false),
+                              ),
+                              topTitles: const AxisTitles(
+                                sideTitles: SideTitles(showTitles: false),
+                              ),
+                              rightTitles: const AxisTitles(
+                                sideTitles: SideTitles(showTitles: false),
+                              ),
+                            ),
+                            borderData: FlBorderData(show: true),
+                            lineBarsData: [
+                              LineChartBarData(
+                                spots: priceHistory
+                                    .asMap()
+                                    .entries
+                                    .map((e) =>
+                                        FlSpot(e.key.toDouble(), e.value.price))
+                                    .toList(),
+                                isCurved: false,
+                                color: Colors.blue,
+                                barWidth: 2,
+                                dotData: const FlDotData(show: false),
+                              ),
+                              LineChartBarData(
+                                spots: _calculateSMA(
+                                  priceHistory.map((p) => p.price).toList(),
+                                  14,
+                                )
+                                    .asMap()
+                                    .entries
+                                    .map((e) => FlSpot(
+                                          (e.key + 14 - 1).toDouble(),
+                                          e.value,
+                                        ))
+                                    .toList(),
+                                isCurved: false,
+                                color: Colors.orange,
+                                barWidth: 2,
+                                dotData: const FlDotData(show: false),
+                              ),
+                            ],
+                            extraLinesData: ExtraLinesData(
+                              horizontalLines: [
+                                if (fallbackSupport > 0)
+                                  HorizontalLine(
+                                    y: fallbackSupport,
+                                    color: Colors.green,
+                                    strokeWidth: 2,
+                                    dashArray: [8, 4],
+                                    label: HorizontalLineLabel(
+                                      show: true,
+                                      alignment: Alignment.topRight,
+                                      style: const TextStyle(
+                                        color: Colors.green,
+                                        fontSize: 12,
+                                      ),
+                                      labelResolver: (line) =>
+                                          'الدعم: \$${line.y.toStringAsFixed(2)}',
+                                    ),
+                                  ),
+                                if (widget.commodity.resistance > 0)
+                                  HorizontalLine(
+                                    y: widget.commodity.resistance,
+                                    color: Colors.red,
+                                    strokeWidth: 2,
+                                    dashArray: [8, 4],
+                                    label: HorizontalLineLabel(
+                                      show: true,
+                                      alignment: Alignment.topRight,
+                                      style: const TextStyle(
+                                        color: Colors.red,
+                                        fontSize: 12,
+                                      ),
+                                      labelResolver: (line) =>
+                                          'المقاومة: \$${line.y.toStringAsFixed(2)}',
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            minY: priceHistory.isNotEmpty
+                                ? ([priceHistory
+                                            .map((p) => p.price)
+                                            .reduce((a, b) => a < b ? a : b),
+                                        fallbackSupport > 0
+                                            ? fallbackSupport
+                                            : double.infinity]
+                                      ..removeWhere((e) => e == double.infinity))
+                                    .reduce((a, b) => a < b ? a : b) *
+                                0.95
+                                : 0,
+                            maxY: priceHistory.isNotEmpty
+                                ? ([priceHistory
+                                            .map((p) => p.price)
+                                            .reduce((a, b) => a > b ? a : b),
+                                        widget.commodity.resistance > 0
+                                            ? widget.commodity.resistance
+                                            : double.negativeInfinity]
+                                      ..removeWhere(
+                                          (e) => e == double.negativeInfinity))
+                                    .reduce((a, b) => a > b ? a : b) *
+                                1.05
+                                : 0,
+                          ),
+                        ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
+  }
+
+  Widget _buildMACDChart() {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'مؤشر MACD',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[800],
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 150,
+              child: isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : macdHistory.isEmpty
+                      ? const Center(
+                          child: Text('فشل تحميل MACD: بيانات غير كافية'))
+                      : LineChart(
+                          LineChartData(
+                            gridData: FlGridData(show: true),
+                            titlesData: FlTitlesData(
+                              leftTitles: AxisTitles(
+                                sideTitles: SideTitles(
+                                  showTitles: true,
+                                  reservedSize: 40,
+                                  getTitlesWidget: (value, meta) {
+                                    return Text(
+                                      value.toStringAsFixed(2),
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.grey,
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                              bottomTitles: const AxisTitles(
+                                sideTitles: SideTitles(showTitles: false),
+                              ),
+                              topTitles: const AxisTitles(
+                                sideTitles: SideTitles(showTitles: false),
+                              ),
+                              rightTitles: const AxisTitles(
+                                sideTitles: SideTitles(showTitles: false),
+                              ),
+                            ),
+                            borderData: FlBorderData(show: true),
+                            lineBarsData: [
+                              LineChartBarData(
+                                spots: macdHistory
+                                    .map((p) =>
+                                        FlSpot(p.index.toDouble(), p.macdLine))
+                                    .toList(),
+                                isCurved: false,
+                                color: Colors.blue,
+                                barWidth: 2,
+                                dotData: const FlDotData(show: false),
+                              ),
+                              LineChartBarData(
+                                spots: macdHistory
+                                    .map((p) => FlSpot(
+                                        p.index.toDouble(), p.signalLine))
+                                    .toList(),
+                                isCurved: false,
+                                color: Colors.yellow,
+                                barWidth: 2,
+                                dotData: const FlDotData(show: false),
+                              ),
+                            ],
+                            extraLinesData: ExtraLinesData(
+                              horizontalLines: [
+                                HorizontalLine(
+                                  y: 0,
+                                  color: Colors.grey,
+                                  strokeWidth: 1,
+                                  dashArray: [5, 5],
+                                ),
+                              ],
+                            ),
+                            minY: macdHistory.isNotEmpty
+                                ? macdHistory
+                                    .map((p) => [p.macdLine, p.signalLine]
+                                        .reduce((a, b) => a < b ? a : b))
+                                    .reduce((a, b) => a < b ? a : b) *
+                                1.1
+                                : -1,
+                            maxY: macdHistory.isNotEmpty
+                                ? macdHistory
+                                    .map((p) => [p.macdLine, p.signalLine]
+                                        .reduce((a, b) => a > b ? a : b))
+                                    .reduce((a, b) => a > b ? a : b) *
+                                1.1
+                                : 1,
+                          ),
+                        ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoCard() {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'السعر الحالي',
+                  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                ),
+                Text(
+                  '\$${_formatNumber(widget.commodity.currentPrice)}',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const Divider(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'التغير',
+                  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                ),
+                Text(
+                  '${widget.commodity.changePercent.toStringAsFixed(2)}%',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: widget.commodity.changePercent >= 0
+                        ? Colors.green
+                        : Colors.red,
+                  ),
+                ),
+              ],
+            ),
+            const Divider(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'المتوسط المتحرك (14 يوم)',
+                  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                ),
+                Text(
+                  '\$${_formatNumber(widget.commodity.sma)}',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const Divider(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'مؤشر القوة النسبية (RSI)',
+                  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                ),
+                Text(
+                  widget.commodity.rsi.toStringAsFixed(1),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: _getRsiColor(widget.commodity.rsi),
+                  ),
+                ),
+              ],
+            ),
+            const Divider(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'حجم التداول الأخير',
+                  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                ),
+                Text(
+                  _formatNumber(widget.commodity.lastVolume.toDouble()),
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const Divider(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'متوسط الحجم',
+                  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                ),
+                Text(
+                  _formatNumber(widget.commodity.avgVolume.toDouble()),
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const Divider(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'الدعم',
+                  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                ),
+                Text(
+                  '\$${_formatNumber(fallbackSupport > 0 ? fallbackSupport : widget.commodity.support)}',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const Divider(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'المقاومة',
+                  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                ),
+                Text(
+                  '\$${_formatNumber(widget.commodity.resistance)}',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildConditionsSection() {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'الشروط المحققة',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[800],
+              ),
+            ),
+            const SizedBox(height: 10),
+            ...widget.commodity.conditions.map((condition) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    children: [
+                      Icon(
+                        condition.contains("شراء")
+                            ? Icons.arrow_upward
+                            : Icons.arrow_downward,
+                        color: condition.contains("شراء")
+                            ? Colors.green
+                            : Colors.red,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          condition,
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: condition.contains("شراء")
+                                ? Colors.green
+                                : Colors.red,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                )),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAnalysisSection() {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'تحليل مفصل',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[800],
+              ),
+            ),
+            const SizedBox(height: 10),
+            ...widget.commodity.analysis.map((item) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('•', style: TextStyle(fontSize: 16)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          item,
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: item.contains("شراء")
+                                ? Colors.green
+                                : item.contains("بيع")
+                                    ? Colors.red
+                                    : Colors.black,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                )),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTradingStrategySection() {
+    if (widget.commodity.entryPrice == null ||
+        widget.commodity.stopLoss == null ||
+        widget.commodity.takeProfit == null) {
+      return Container();
+    }
+
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'إستراتيجية التداول المقترحة',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[800],
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'سعر الدخول',
+                  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                ),
+                Text(
+                  '\$${_formatNumber(widget.commodity.entryPrice!)}',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const Divider(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'وقف الخسارة',
+                  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                ),
+                Text(
+                  '\$${_formatNumber(widget.commodity.stopLoss!)}',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red,
+                  ),
+                ),
+              ],
+            ),
+            const Divider(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'جني الأرباح',
+                  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                ),
+                Text(
+                  '\$${_formatNumber(widget.commodity.takeProfit!)}',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Color _getRsiColor(double rsi) {
+    if (rsi > 70) return Colors.red;
+    if (rsi < 30) return Colors.green;
+    return Colors.black;
+  }
+
+  String _formatNumber(double num) {
+    String formatted = num.toStringAsFixed(2);
+    final parts = formatted.split('.');
+    final integerPart = parts[0].replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]},',
+    );
+    return parts.length > 1 ? '$integerPart.${parts[1]}' : integerPart;
   }
 
   IconData _getCommodityIcon(String category) {

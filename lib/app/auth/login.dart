@@ -73,7 +73,7 @@ class _LoginState extends State<Login> {
                     const SizedBox(height: 30),
                     CustomtextFormSign(
                       valid: (val) {
-                        return validInput(val!, 3, 20);
+                        return validInput(val!, 3, 20,"");
                       },
                       key: UniqueKey(),
                       hint: "Email",
@@ -82,7 +82,7 @@ class _LoginState extends State<Login> {
                     const SizedBox(height: 1),
                     CustomtextFormSign(
                       valid: (val) {
-                        return validInput(val!, 3, 20);
+                        return validInput(val!, 3, 20,"");
                       },
                       key: UniqueKey(),
                       hint: "Password",

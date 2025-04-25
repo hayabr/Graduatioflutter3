@@ -1,16 +1,186 @@
 import 'package:flutter/material.dart';
+import 'package:fl_chart/fl_chart.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'package:graduationproject/app/Recommendation/forex_recommendation.dart';
 
-class ForexDetailsPage extends StatelessWidget {
+class ForexPricePoint {
+  final DateTime date;
+  final double price;
+
+  ForexPricePoint({required this.date, required this.price});
+}
+
+class ForexMACDPoint {
+  final int index;
+  final double macdLine;
+  final double signalLine;
+  final double histogram;
+
+  ForexMACDPoint({
+    required this.index,
+    required this.macdLine,
+    required this.signalLine,
+    required this.histogram,
+  });
+}
+
+class ForexDetailsPage extends StatefulWidget {
   final ForexRecommendation forex;
 
   const ForexDetailsPage({super.key, required this.forex});
 
   @override
+  _ForexDetailsPageState createState() => _ForexDetailsPageState();
+}
+
+class _ForexDetailsPageState extends State<ForexDetailsPage> {
+  List<ForexPricePoint> priceHistory = [];
+  List<ForexMACDPoint> macdHistory = [];
+  bool isLoading = true;
+  double fallbackSupport = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    fetchPriceHistory();
+  }
+
+  Future<void> fetchPriceHistory() async {
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      String symbol = widget.forex.symbol; // Ensure ForexRecommendation has a symbol (e.g., "EURUSD=X")
+      final response = await http.get(
+        Uri.parse(
+          'https://query1.finance.yahoo.com/v8/finance/chart/$symbol?range=3mo&interval=1d',
+        ),
+        headers: {'User-Agent': 'Mozilla/5.0'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final result = data['chart']['result'][0];
+        final timestamps = result['timestamp'] as List<dynamic>;
+        final closes = result['indicators']['quote'][0]['close'] as List<dynamic>;
+        final lows = result['indicators']['quote'][0]['low'] as List<dynamic>;
+
+        final List<ForexPricePoint> points = [];
+        final List<double> validCloses = [];
+        final List<double> validLows = [];
+
+        for (int i = 0; i < timestamps.length; i++) {
+          if (closes[i] != null && lows[i] != null) {
+            points.add(ForexPricePoint(
+              date: DateTime.fromMillisecondsSinceEpoch(timestamps[i] * 1000),
+              price: closes[i].toDouble(),
+            ));
+            validCloses.add(closes[i].toDouble());
+            validLows.add(lows[i].toDouble());
+          }
+        }
+
+        if (validCloses.length < 26) {
+          print('Not enough data for MACD: ${validCloses.length} points');
+          setState(() {
+            priceHistory = points;
+            macdHistory = [];
+            fallbackSupport = validLows.isNotEmpty
+                ? validLows.reduce((a, b) => a < b ? a : b)
+                : widget.forex.support;
+            isLoading = false;
+          });
+          return;
+        }
+
+        final macdData = _calculateMACD(validCloses);
+        final macdPoints = <ForexMACDPoint>[];
+        final macdLine = macdData['macdLine']!;
+        final signalLine = macdData['signalLine']!;
+        for (int i = 0; i < macdLine.length && i < signalLine.length; i++) {
+          macdPoints.add(ForexMACDPoint(
+            index: i,
+            macdLine: macdLine[i],
+            signalLine: signalLine[i],
+            histogram: macdLine[i] - signalLine[i],
+          ));
+        }
+
+        setState(() {
+          priceHistory = points;
+          macdHistory = macdPoints;
+          fallbackSupport = validLows.isNotEmpty
+              ? validLows.reduce((a, b) => a < b ? a : b)
+              : widget.forex.support;
+          isLoading = false;
+        });
+      } else {
+        print('Failed to fetch price history: ${response.statusCode}');
+        throw Exception('Failed to load price history');
+      }
+    } catch (e) {
+      print('Error loading price history: $e');
+      setState(() {
+        isLoading = false;
+        priceHistory = [];
+        macdHistory = [];
+        fallbackSupport = widget.forex.support;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('خطأ في تحميل البيانات: $e')),
+      );
+    }
+  }
+
+  List<double> _calculateSMA(List<double> prices, int period) {
+    List<double> sma = [];
+    for (int i = period - 1; i < prices.length; i++) {
+      double sum = 0;
+      for (int j = 0; j < period; j++) {
+        sum += prices[i - j];
+      }
+      sma.add(sum / period);
+    }
+    return sma;
+  }
+
+  Map<String, List<double>> _calculateMACD(List<double> prices) {
+    List<double> calculateEMA(List<double> prices, int period) {
+      List<double> ema = [];
+      if (prices.length < period) return ema;
+      double multiplier = 2 / (period + 1);
+      ema.add(prices.sublist(0, period).reduce((a, b) => a + b) / period);
+
+      for (int i = period; i < prices.length; i++) {
+        double value = (prices[i] * multiplier) + (ema.last * (1 - multiplier));
+        ema.add(value);
+      }
+      return ema;
+    }
+
+    List<double> ema12 = calculateEMA(prices, 12);
+    List<double> ema26 = calculateEMA(prices, 26);
+
+    List<double> macdLine = [];
+    for (int i = 0; i < ema12.length && i < ema26.length; i++) {
+      macdLine.add(ema12[i] - ema26[i]);
+    }
+
+    List<double> signalLine = calculateEMA(macdLine, 9);
+
+    return {
+      'macdLine': macdLine,
+      'signalLine': signalLine,
+    };
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(forex.title),
+        title: Text(widget.forex.title),
         backgroundColor: Colors.white,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.black),
@@ -20,9 +190,17 @@ class ForexDetailsPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            _buildHeader(),
+            const SizedBox(height: 20),
             _buildRecommendationCard(),
             const SizedBox(height: 20),
+            _buildPriceChart(),
+            const SizedBox(height: 20),
+            _buildMACDChart(),
+            const SizedBox(height: 20),
             _buildInfoCard(),
+            const SizedBox(height: 20),
+            _buildConditionsSection(),
             const SizedBox(height: 20),
             _buildAnalysisSection(),
             const SizedBox(height: 20),
@@ -33,118 +211,43 @@ class ForexDetailsPage extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoCard() {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
+  Widget _buildHeader() {
+    return Row(
+      children: [
+        Icon(
+          Icons.currency_exchange,
+          size: 40,
+          color: Colors.blue,
+        ),
+        const SizedBox(width: 16),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'السعر الحالي',
-                  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                ),
-                Text(
-                  _formatNumber(forex.currentPrice),
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ],
+            Text(
+              widget.forex.title,
+              style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-            const Divider(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'التغير',
-                  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                ),
-                Text(
-                  '${forex.changePercent.toStringAsFixed(2)}%',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: forex.changePercent >= 0 ? Colors.green : Colors.red,
-                  ),
-                ),
-              ],
-            ),
-            const Divider(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'المتوسط المتحرك (14 يوم)',
-                  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                ),
-                Text(
-                  _formatNumber(forex.sma),
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            const Divider(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'مؤشر القوة النسبية (RSI)',
-                  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                ),
-                Text(
-                  forex.rsi.toStringAsFixed(2),
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: _getRsiColor(forex.rsi),
-                  ),
-                ),
-              ],
-            ),
-            const Divider(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'الدعم',
-                  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                ),
-                Text(
-                  _formatNumber(forex.support),
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            const Divider(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'المقاومة',
-                  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                ),
-                Text(
-                  _formatNumber(forex.resistance),
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ],
+            Text(
+              widget.forex.subtitle ?? 'Forex Pair',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey[600],
+              ),
             ),
           ],
         ),
-      ),
+      ],
     );
   }
 
   Widget _buildRecommendationCard() {
     Color cardColor;
-    if (forex.recommendation.contains('🟢')) {
+    if (widget.forex.recommendation.contains('🟢')) {
       cardColor = Colors.green.withOpacity(0.1);
-    } else if (forex.recommendation.contains('🔴')) {
+    } else if (widget.forex.recommendation.contains('🔴')) {
       cardColor = Colors.red.withOpacity(0.1);
     } else {
       cardColor = Colors.blue.withOpacity(0.1);
@@ -171,13 +274,450 @@ class ForexDetailsPage extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             Text(
-              forex.recommendation,
+              widget.forex.recommendation,
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
-                color: _getRecommendationColor(forex.recommendation),
+                color: _getRecommendationColor(widget.forex.recommendation),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPriceChart() {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'سجل الأسعار',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[800],
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 200,
+              child: isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : priceHistory.isEmpty
+                      ? const Center(child: Text('لا توجد بيانات أسعار متاحة'))
+                      : LineChart(
+                          LineChartData(
+                            gridData: const FlGridData(show: true),
+                            titlesData: FlTitlesData(
+                              leftTitles: AxisTitles(
+                                sideTitles: SideTitles(
+                                  showTitles: true,
+                                  reservedSize: 40,
+                                  getTitlesWidget: (value, meta) {
+                                    return Text(
+                                      _formatNumber(value),
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.grey,
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                              bottomTitles: const AxisTitles(
+                                sideTitles: SideTitles(showTitles: false),
+                              ),
+                              topTitles: const AxisTitles(
+                                sideTitles: SideTitles(showTitles: false),
+                              ),
+                              rightTitles: const AxisTitles(
+                                sideTitles: SideTitles(showTitles: false),
+                              ),
+                            ),
+                            borderData: FlBorderData(show: true),
+                            lineBarsData: [
+                              LineChartBarData(
+                                spots: priceHistory
+                                    .asMap()
+                                    .entries
+                                    .map((e) =>
+                                        FlSpot(e.key.toDouble(), e.value.price))
+                                    .toList(),
+                                isCurved: false,
+                                color: Colors.blue,
+                                barWidth: 2,
+                                dotData: const FlDotData(show: false),
+                              ),
+                              LineChartBarData(
+                                spots: _calculateSMA(
+                                  priceHistory.map((p) => p.price).toList(),
+                                  14,
+                                )
+                                    .asMap()
+                                    .entries
+                                    .map((e) => FlSpot(
+                                          (e.key + 14 - 1).toDouble(),
+                                          e.value,
+                                        ))
+                                    .toList(),
+                                isCurved: false,
+                                color: Colors.orange,
+                                barWidth: 2,
+                                dotData: const FlDotData(show: false),
+                              ),
+                            ],
+                            extraLinesData: ExtraLinesData(
+                              horizontalLines: [
+                                if (fallbackSupport > 0)
+                                  HorizontalLine(
+                                    y: fallbackSupport,
+                                    color: Colors.green,
+                                    strokeWidth: 2,
+                                    dashArray: [8, 4],
+                                    label: HorizontalLineLabel(
+                                      show: true,
+                                      alignment: Alignment.topRight,
+                                      style: const TextStyle(
+                                        color: Colors.green,
+                                        fontSize: 12,
+                                      ),
+                                      labelResolver: (line) =>
+                                          'الدعم: ${_formatNumber(line.y)}',
+                                    ),
+                                  ),
+                                if (widget.forex.resistance > 0)
+                                  HorizontalLine(
+                                    y: widget.forex.resistance,
+                                    color: Colors.red,
+                                    strokeWidth: 2,
+                                    dashArray: [8, 4],
+                                    label: HorizontalLineLabel(
+                                      show: true,
+                                      alignment: Alignment.topRight,
+                                      style: const TextStyle(
+                                        color: Colors.red,
+                                        fontSize: 12,
+                                      ),
+                                      labelResolver: (line) =>
+                                          'المقاومة: ${_formatNumber(line.y)}',
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            minY: priceHistory.isNotEmpty
+                                ? ([priceHistory
+                                            .map((p) => p.price)
+                                            .reduce((a, b) => a < b ? a : b),
+                                        fallbackSupport > 0
+                                            ? fallbackSupport
+                                            : double.infinity]
+                                      ..removeWhere((e) => e == double.infinity))
+                                    .reduce((a, b) => a < b ? a : b) *
+                                0.95
+                                : 0,
+                            maxY: priceHistory.isNotEmpty
+                                ? ([priceHistory
+                                            .map((p) => p.price)
+                                            .reduce((a, b) => a > b ? a : b),
+                                        widget.forex.resistance > 0
+                                            ? widget.forex.resistance
+                                            : double.negativeInfinity]
+                                      ..removeWhere(
+                                          (e) => e == double.negativeInfinity))
+                                    .reduce((a, b) => a > b ? a : b) *
+                                1.05
+                                : 0,
+                          ),
+                        ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMACDChart() {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'مؤشر MACD',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[800],
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 150,
+              child: isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : macdHistory.isEmpty
+                      ? const Center(
+                          child: Text('فشل تحميل MACD: بيانات غير كافية'))
+                      : LineChart(
+                          LineChartData(
+                            gridData: FlGridData(show: true),
+                            titlesData: FlTitlesData(
+                              leftTitles: AxisTitles(
+                                sideTitles: SideTitles(
+                                  showTitles: true,
+                                  reservedSize: 40,
+                                  getTitlesWidget: (value, meta) {
+                                    return Text(
+                                      _formatNumber(value),
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.grey,
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                              bottomTitles: const AxisTitles(
+                                sideTitles: SideTitles(showTitles: false),
+                              ),
+                              topTitles: const AxisTitles(
+                                sideTitles: SideTitles(showTitles: false),
+                              ),
+                              rightTitles: const AxisTitles(
+                                sideTitles: SideTitles(showTitles: false),
+                              ),
+                            ),
+                            borderData: FlBorderData(show: true),
+                            lineBarsData: [
+                              LineChartBarData(
+                                spots: macdHistory
+                                    .map((p) =>
+                                        FlSpot(p.index.toDouble(), p.macdLine))
+                                    .toList(),
+                                isCurved: false,
+                                color: Colors.blue,
+                                barWidth: 2,
+                                dotData: const FlDotData(show: false),
+                              ),
+                              LineChartBarData(
+                                spots: macdHistory
+                                    .map((p) => FlSpot(
+                                        p.index.toDouble(), p.signalLine))
+                                    .toList(),
+                                isCurved: false,
+                                color: Colors.yellow,
+                                barWidth: 2,
+                                dotData: const FlDotData(show: false),
+                              ),
+                            ],
+                            extraLinesData: ExtraLinesData(
+                              horizontalLines: [
+                                HorizontalLine(
+                                  y: 0,
+                                  color: Colors.grey,
+                                  strokeWidth: 1,
+                                  dashArray: [5, 5],
+                                ),
+                              ],
+                            ),
+                            minY: macdHistory.isNotEmpty
+                                ? macdHistory
+                                    .map((p) => [p.macdLine, p.signalLine]
+                                        .reduce((a, b) => a < b ? a : b))
+                                    .reduce((a, b) => a < b ? a : b) *
+                                1.1
+                                : -1,
+                            maxY: macdHistory.isNotEmpty
+                                ? macdHistory
+                                    .map((p) => [p.macdLine, p.signalLine]
+                                        .reduce((a, b) => a > b ? a : b))
+                                    .reduce((a, b) => a > b ? a : b) *
+                                1.1
+                                : 1,
+                          ),
+                        ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoCard() {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'السعر الحالي',
+                  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                ),
+                Text(
+                  _formatNumber(widget.forex.currentPrice),
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const Divider(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'التغير',
+                  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                ),
+                Text(
+                  '${widget.forex.changePercent.toStringAsFixed(2)}%',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: widget.forex.changePercent >= 0
+                        ? Colors.green
+                        : Colors.red,
+                  ),
+                ),
+              ],
+            ),
+            const Divider(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'المتوسط المتحرك (14 يوم)',
+                  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                ),
+                Text(
+                  _formatNumber(widget.forex.sma),
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const Divider(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'مؤشر القوة النسبية (RSI)',
+                  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                ),
+                Text(
+                  widget.forex.rsi.toStringAsFixed(2),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: _getRsiColor(widget.forex.rsi),
+                  ),
+                ),
+              ],
+            ),
+            const Divider(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'الدعم',
+                  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                ),
+                Text(
+                  _formatNumber(
+                      fallbackSupport > 0 ? fallbackSupport : widget.forex.support),
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const Divider(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'المقاومة',
+                  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                ),
+                Text(
+                  _formatNumber(widget.forex.resistance),
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildConditionsSection() {
+    // Assuming ForexRecommendation has a conditions list; if not, add it to the model
+    final conditions = widget.forex.conditions ?? [];
+    if (conditions.isEmpty) return Container();
+
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'الشروط المحققة',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[800],
+              ),
+            ),
+            const SizedBox(height: 10),
+            ...conditions.map((condition) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    children: [
+                      Icon(
+                        condition.contains("شراء")
+                            ? Icons.arrow_upward
+                            : Icons.arrow_downward,
+                        color: condition.contains("شراء")
+                            ? Colors.green
+                            : Colors.red,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          condition,
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: condition.contains("شراء")
+                                ? Colors.green
+                                : Colors.red,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                )),
           ],
         ),
       ),
@@ -204,7 +744,7 @@ class ForexDetailsPage extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 10),
-            ...forex.analysis.map((item) => Padding(
+            ...widget.forex.analysis.map((item) => Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -214,7 +754,14 @@ class ForexDetailsPage extends StatelessWidget {
                       Expanded(
                         child: Text(
                           item,
-                          style: const TextStyle(fontSize: 16),
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: item.contains("شراء")
+                                ? Colors.green
+                                : item.contains("بيع")
+                                    ? Colors.red
+                                    : Colors.black,
+                          ),
                         ),
                       ),
                     ],
@@ -227,9 +774,9 @@ class ForexDetailsPage extends StatelessWidget {
   }
 
   Widget _buildTradingStrategySection() {
-    if (forex.entryPrice == null ||
-        forex.stopLoss == null ||
-        forex.takeProfit == null) {
+    if (widget.forex.entryPrice == null ||
+        widget.forex.stopLoss == null ||
+        widget.forex.takeProfit == null) {
       return Container();
     }
 
@@ -260,8 +807,11 @@ class ForexDetailsPage extends StatelessWidget {
                   style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                 ),
                 Text(
-                  _formatNumber(forex.entryPrice!),
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  _formatNumber(widget.forex.entryPrice!),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
@@ -274,7 +824,7 @@ class ForexDetailsPage extends StatelessWidget {
                   style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                 ),
                 Text(
-                  _formatNumber(forex.stopLoss!),
+                  _formatNumber(widget.forex.stopLoss!),
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -292,7 +842,7 @@ class ForexDetailsPage extends StatelessWidget {
                   style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                 ),
                 Text(
-                  _formatNumber(forex.takeProfit!),
+                  _formatNumber(widget.forex.takeProfit!),
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -320,7 +870,6 @@ class ForexDetailsPage extends StatelessWidget {
   }
 
   String _formatNumber(double num) {
-    // Format to 4 decimal places for Forex prices
-    return num.toStringAsFixed(4);
+    return num.toStringAsFixed(4); // Forex prices typically use 4 decimal places
   }
 }

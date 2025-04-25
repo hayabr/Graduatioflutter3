@@ -64,7 +64,7 @@ class _SignUpState extends State<Signup> {
                     const SizedBox(height: 20),
                      CustomtextFormSign(
                       valid: (val){
-                        return validInput(val!, 3,20);
+                        return validInput(val!, 3,20,"");
                       },
                       key: UniqueKey(),
                       hint: "username",
@@ -73,7 +73,7 @@ class _SignUpState extends State<Signup> {
                      const SizedBox(height: 1),
                     CustomtextFormSign(
                        valid: (val){
-                        return validInput(val!, 5,40);
+                        return validInput(val!, 5,40,"");
                       },
                       key: UniqueKey(),
                       hint: "Email",
@@ -82,7 +82,7 @@ class _SignUpState extends State<Signup> {
                     const SizedBox(height: 1),
                     CustomtextFormSign(
                        valid: (val){
-                        return validInput(val!, 3,10);
+                        return validInput(val!, 3,10,"");
                       },
                       key: UniqueKey(),
                       hint: "Password",

@@ -38,8 +38,8 @@ class BottomNavBar extends StatelessWidget {
           label: "Markets",
         ),
         BottomNavigationBarItem(
-          icon: Icon(Icons.more_horiz, size: 28),
-          label: "More",
+          icon: Icon(Icons.person, size: 28),
+          label: "profile",
         ),
       ],
       currentIndex: selectedIndex,
