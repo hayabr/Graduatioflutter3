@@ -7,6 +7,21 @@ import 'package:graduationproject/widgets/BottomNavBar.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
+// Class to store MACD points for commodities
+class CommodityMACDPoint {
+  final int index;
+  final double macdLine;
+  final double signalLine;
+  final double histogram;
+
+  CommodityMACDPoint({
+    required this.index,
+    required this.macdLine,
+    required this.signalLine,
+    required this.histogram,
+  });
+}
+
 class CommodityRecommendation {
   final String symbol;
   final String title;
@@ -198,7 +213,8 @@ class _CommoditiesRecommendationState extends State<CommoditiesRecommendation> w
   }
 
   List<double> _extractList(dynamic list) {
-    return List<double>.from(list.where((e) => e != null).map((e) => (e as num).toDouble()));
+    return List<double>.from(
+        list.where((e) => e != null).map((e) => (e as num).toDouble()));
   }
 
   List<double> _calculateSMA(List<double> prices, int period) {
@@ -236,9 +252,10 @@ class _CommoditiesRecommendationState extends State<CommoditiesRecommendation> w
     return rsi;
   }
 
-  Map<String, List<double>> _calculateMACD(List<double> prices) {
+  List<CommodityMACDPoint> _calculateMACDHistory(List<double> prices) {
     List<double> calculateEMA(List<double> prices, int period) {
       List<double> ema = [];
+      if (prices.length < period) return ema;
       double multiplier = 2 / (period + 1);
       ema.add(prices.sublist(0, period).reduce((a, b) => a + b) / period);
 
@@ -259,10 +276,17 @@ class _CommoditiesRecommendationState extends State<CommoditiesRecommendation> w
 
     List<double> signalLine = calculateEMA(macdLine, 9);
 
-    return {
-      'macdLine': macdLine,
-      'signalLine': signalLine,
-    };
+    List<CommodityMACDPoint> macdPoints = [];
+    for (int i = 0; i < macdLine.length && i < signalLine.length; i++) {
+      macdPoints.add(CommodityMACDPoint(
+        index: i,
+        macdLine: macdLine[i],
+        signalLine: signalLine[i],
+        histogram: macdLine[i] - signalLine[i],
+      ));
+    }
+
+    return macdPoints;
   }
 
   double _calculateATR(List<double> highs, List<double> lows, List<double> closes) {
@@ -277,11 +301,7 @@ class _CommoditiesRecommendationState extends State<CommoditiesRecommendation> w
   }
 
   CommodityRecommendation _generateCommodityRecommendation(
-    String symbol,
-    String name,
-    String category,
-    Map<String, dynamic> data,
-  ) {
+      String symbol, String name, String category, Map<String, dynamic> data) {
     final result = data['chart']['result'][0];
     final meta = result['meta'];
     final quote = result['indicators']['quote'][0];
@@ -291,7 +311,7 @@ class _CommoditiesRecommendationState extends State<CommoditiesRecommendation> w
     final highs = _extractList(quote['high']);
     final lows = _extractList(quote['low']);
 
-    if (closes.length < 15 || highs.length < 15 || lows.length < 15) {
+    if (closes.length < 26 || highs.length < 15 || lows.length < 15) {
       return CommodityRecommendation(
         symbol: symbol,
         title: name,
@@ -305,9 +325,9 @@ class _CommoditiesRecommendationState extends State<CommoditiesRecommendation> w
         support: 0,
         resistance: 0,
         changePercent: 0,
-        recommendation: "⚠️ لا توجد بيانات كافية",
+        recommendation: "⚠️ Insufficient Data",
         recommendationColor: Colors.grey,
-        analysis: ["⚠️ لا توجد بيانات كافية لتحليل السلعة"],
+        analysis: ["⚠️ Insufficient data for commodity analysis"],
         conditions: [],
         buySignals: 0,
         sellSignals: 0,
@@ -317,200 +337,254 @@ class _CommoditiesRecommendationState extends State<CommoditiesRecommendation> w
     final lastClose = closes.last;
     final firstClose = closes.first;
     final lastVolume = volumes.isNotEmpty ? volumes.last : 0;
-    final avgVolume = volumes.isNotEmpty ? volumes.reduce((a, b) => a + b) / volumes.length : 0;
+    final avgVolume = volumes.isNotEmpty
+        ? volumes.reduce((a, b) => a + b) / volumes.length
+        : 0;
     final sma = _calculateSMA(closes, 14);
     final lastSMA = sma.isNotEmpty ? sma.last : lastClose;
     final rsi = _calculateRSI(closes, 14);
     final percentChange = ((lastClose - firstClose) / firstClose) * 100;
 
-    // تحسين الدعم والمقاومة
-    List<double> supports = lows.where((low) => lows.where((l) => l <= low * 1.01 && l >= low * 0.99).length >= 3).toList();
-    List<double> resistances = highs.where((high) => highs.where((h) => h <= high * 1.01 && h >= high * 0.99).length >= 3).toList();
-    final support = supports.isNotEmpty ? supports.reduce((a, b) => a < b ? a : b) : lows.reduce((a, b) => a < b ? a : b);
-    final resistance = resistances.isNotEmpty ? resistances.reduce((a, b) => a > b ? a : b) : highs.reduce((a, b) => a > b ? a : b);
+    // Improved support and resistance
+    List<double> supports = lows
+        .where((low) => lows.where((l) => l <= low * 1.01 && l >= low * 0.99).length >= 3)
+        .toList();
+    List<double> resistances = highs
+        .where((high) => highs.where((h) => h <= high * 1.01 && h >= high * 0.99).length >= 3)
+        .toList();
+    final support = supports.isNotEmpty
+        ? supports.reduce((a, b) => a < b ? a : b)
+        : lows.reduce((a, b) => a < b ? a : b);
+    final resistance = resistances.isNotEmpty
+        ? resistances.reduce((a, b) => a > b ? a : b)
+        : highs.reduce((a, b) => a > b ? a : b);
 
-    // حساب ATR لتخصيص العتبات
+    // Calculate ATR for threshold customization
     final atr = _calculateATR(highs, lows, closes);
     final smaThreshold = atr > 0 ? 0.05 * (atr / lastClose) : 0.05;
     final percentChangeThreshold = atr > 0 ? 0.05 * (atr / lastClose) * 100 : 5.0;
 
-    // حساب MACD مع الهيستوغرام
-    final macdData = _calculateMACD(closes);
-    final macdLine = macdData['macdLine']!;
-    final signalLine = macdData['signalLine']!;
-    final histogram = macdLine.isNotEmpty && signalLine.isNotEmpty ? macdLine.last - signalLine.last : 0;
-    bool isMacdBuy = macdLine.isNotEmpty &&
-        signalLine.isNotEmpty &&
-        macdLine.length >= 2 &&
-        signalLine.length >= 2 &&
-        macdLine.last > signalLine.last &&
-        macdLine[macdLine.length - 2] <= signalLine[signalLine.length - 2] &&
-        histogram > 0;
-    bool isMacdSell = macdLine.isNotEmpty &&
-        signalLine.isNotEmpty &&
-        macdLine.length >= 2 &&
-        signalLine.length >= 2 &&
-        macdLine.last < signalLine.last &&
-        macdLine[macdLine.length - 2] >= signalLine[signalLine.length - 2] &&
-        histogram < 0;
+    // Calculate MACD with full history
+    final macdHistory = _calculateMACDHistory(closes);
+    final latestMACD = macdHistory.isNotEmpty ? macdHistory.last : null;
+    final isBullish = latestMACD != null && latestMACD.histogram > 0;
+    final isBearish = latestMACD != null && latestMACD.histogram < 0;
+    final isCrossOver = macdHistory.length >= 2 &&
+        ((macdHistory[macdHistory.length - 2].histogram <= 0 && isBullish) ||
+            (macdHistory[macdHistory.length - 2].histogram >= 0 && isBearish));
+    final isTrendingUp = macdHistory.length >= 3 &&
+        macdHistory[macdHistory.length - 3].macdLine <
+            macdHistory[macdHistory.length - 2].macdLine &&
+        macdHistory[macdHistory.length - 2].macdLine <
+            macdHistory[macdHistory.length - 1].macdLine;
+    final isTrendingDown = macdHistory.length >= 3 &&
+        macdHistory[macdHistory.length - 3].macdLine >
+            macdHistory[macdHistory.length - 2].macdLine &&
+        macdHistory[macdHistory.length - 2].macdLine >
+            macdHistory[macdHistory.length - 1].macdLine;
 
-    // تعريف الشروط الستة مع إزالة الحالة المحايدة
+    // Detailed MACD analysis
+    List<String> macdAnalysis = [];
+    String macdCondition = "Weak Sell - MACD indicates bearish trend"; // Default
+    if (isCrossOver) {
+      if (isBullish) {
+        macdAnalysis.add("Strong bullish crossover: MACD line crossed above signal line with positive histogram (strong buy signal).");
+        macdCondition = "Strong Buy - Bullish MACD crossover with positive histogram";
+      } else {
+        macdAnalysis.add("Strong bearish crossover: MACD line crossed below signal line with negative histogram (strong sell signal).");
+        macdCondition = "Strong Sell - Bearish MACD crossover with negative histogram";
+      }
+    } else if (latestMACD != null && latestMACD.macdLine > latestMACD.signalLine) {
+      macdAnalysis.add("Bullish trend: MACD line is above signal line, indicating bullish momentum (weak buy signal).");
+      macdCondition = "Weak Buy - MACD indicates bullish trend";
+    } else if (latestMACD != null && latestMACD.macdLine < latestMACD.signalLine) {
+      macdAnalysis.add("Bearish trend: MACD line is below signal line, indicating bearish momentum (weak sell signal).");
+      macdCondition = "Weak Sell - MACD indicates bearish trend";
+    }
+
+    if (isTrendingUp) {
+      macdAnalysis.add("Sustained bullish momentum: MACD line has been rising for the last three periods.");
+    } else if (isTrendingDown) {
+      macdAnalysis.add("Sustained bearish momentum: MACD line has been declining for the last three periods.");
+    }
+
+    if (latestMACD != null && latestMACD.histogram.abs() > 0.5) {
+      macdAnalysis.add("Strong momentum: Histogram shows a large value (${latestMACD.histogram.toStringAsFixed(2)}), indicating a strong trend.");
+    } else if (latestMACD != null) {
+      macdAnalysis.add("Moderate momentum: Histogram shows a small value (${latestMACD.histogram.toStringAsFixed(2)}), indicating a non-strong trend.");
+    }
+
+    // Define the six conditions with updated MACD condition
     final conditions = [
-      // 1. المتوسط المتحرك
+      // 1. Moving Average
       lastClose < lastSMA * (1 - smaThreshold)
-          ? "شراء قوي - السعر أقل من المتوسط المتحرك بنسبة ${((smaThreshold * 100).toStringAsFixed(2))}٪"
+          ? "Strong Buy - Price is below moving average by ${((smaThreshold * 100).toStringAsFixed(2))}%"
           : lastClose < lastSMA
-              ? "شراء ضعيف - السعر أقل من المتوسط المتحرك قليلاً"
+              ? "Weak Buy - Price is slightly below moving average"
               : lastClose > lastSMA * (1 + smaThreshold)
-                  ? "بيع قوي - السعر أعلى من المتوسط المتحرك بنسبة ${((smaThreshold * 100).toStringAsFixed(2))}٪"
-                  : "بيع ضعيف - السعر أعلى من المتوسط المتحرك قليلاً",
+                  ? "Strong Sell - Price is above moving average by ${((smaThreshold * 100).toStringAsFixed(2))}%"
+                  : "Weak Sell - Price is slightly above moving average",
 
       // 2. RSI
       rsi < 30
-          ? "شراء قوي - RSI في ذروة البيع (<30)"
+          ? "Strong Buy - RSI in oversold territory (<30)"
           : rsi < 50
-              ? "شراء ضعيف - RSI يشير إلى ميل للشراء"
+              ? "Weak Buy - RSI indicates buying trend"
               : rsi > 70
-                  ? "بيع قوي - RSI في ذروة الشراء (>70)"
-                  : "بيع ضعيف - RSI يشير إلى ميل للبيع",
+                  ? "Strong Sell - RSI in overbought territory (>70)"
+                  : "Weak Sell - RSI indicates selling trend",
 
-      // 3. حجم التداول
+      // 3. Volume
       lastVolume > avgVolume * 1.3 && lastClose > lastSMA
-          ? "شراء قوي - حجم تداول مرتفع مع صعود"
+          ? "Strong Buy - High trading volume with upward trend"
           : lastVolume > avgVolume && lastClose > lastSMA
-              ? "شراء ضعيف - حجم تداول مرتفع قليلاً مع صعود"
+              ? "Weak Buy - Slightly high trading volume with upward trend"
               : lastVolume > avgVolume * 1.3 && lastClose < lastSMA
-                  ? "بيع قوي - حجم تداول مرتفع مع هبوط"
+                  ? "Strong Sell - High trading volume with downward trend"
                   : lastVolume > avgVolume && lastClose < lastSMA
-                      ? "بيع ضعيف - حجم تداول مرتفع قليلاً مع هبوط"
+                      ? "Weak Sell - Slightly high trading volume with downward trend"
                       : lastClose > lastSMA
-                          ? "شراء ضعيف - السعر صاعد بدون حجم قوي"
-                          : "بيع ضعيف - السعر هابط بدون حجم قوي",
+                          ? "Weak Buy - Upward price trend without strong volume"
+                          : "Weak Sell - Downward price trend without strong volume",
 
-      // 4. التغير السعري
+      // 4. Price Change
       percentChange < -percentChangeThreshold
-          ? "شراء قوي - انخفاض قوي (>${percentChangeThreshold.toStringAsFixed(2)}%)"
+          ? "Strong Buy - Strong decline (>${percentChangeThreshold.toStringAsFixed(2)}%)"
           : percentChange < 0
-              ? "شراء ضعيف - انخفاض طفيف"
+              ? "Weak Buy - Slight decline"
               : percentChange > percentChangeThreshold
-                  ? "بيع قوي - ارتفاع قوي (>${percentChangeThreshold.toStringAsFixed(2)}%)"
-                  : "بيع ضعيف - ارتفاع طفيف",
+                  ? "Strong Sell - Strong rise (>${percentChangeThreshold.toStringAsFixed(2)}%)"
+                  : "Weak Sell - Slight rise",
 
-      // 5. الدعم والمقاومة
+      // 5. Support and Resistance
       lastClose <= support * 1.02
-          ? "شراء قوي - السعر قريب من مستوى الدعم"
+          ? "Strong Buy - Price is near support level"
           : lastClose < (support + resistance) / 2
-              ? "شراء ضعيف - السعر أقرب إلى الدعم"
+              ? "Weak Buy - Price is closer to support"
               : lastClose >= resistance * 0.98
-                  ? "بيع قوي - السعر قريب من مستوى المقاومة"
-                  : "بيع ضعيف - السعر أقرب إلى المقاومة",
+                  ? "Strong Sell - Price is near resistance level"
+                  : "Weak Sell - Price is closer to resistance",
 
       // 6. MACD
-      isMacdBuy
-          ? "شراء قوي - تقاطع MACD صعودي مع هيستوغرام إيجابي"
-          : macdLine.isNotEmpty && signalLine.isNotEmpty && macdLine.last > signalLine.last
-              ? "شراء ضعيف - MACD يشير إلى ميل صعودي"
-              : isMacdSell
-                  ? "بيع قوي - تقاطع MACD هبوطي مع هيستوغرام سلبي"
-                  : "بيع ضعيف - MACD يشير إلى ميل هبوطي",
+      macdCondition,
     ];
 
-    final buySignals = conditions.where((c) => c.contains("شراء قوي")).length;
-    final sellSignals = conditions.where((c) => c.contains("بيع قوي")).length;
+    final buySignals = conditions.where((c) => c.contains("Buy")).length;
+    final sellSignals = conditions.where((c) => c.contains("Sell")).length;
+    final strongBuySignals = conditions.where((c) => c.contains("Strong Buy")).length;
+    final strongSellSignals = conditions.where((c) => c.contains("Strong Sell")).length;
 
     String recommendation;
     Color recommendationColor;
     double? entryPrice, stopLoss, takeProfit;
 
-    // نظام التوصية
-    if (buySignals >= 4 && sellSignals == 0) {
-      recommendation = "🟢 شراء قوي (إشارات: $buySignals)";
+    // Modified recommendation logic
+    if (buySignals > sellSignals) {
+      recommendation = "🟢 Buy";
       recommendationColor = Colors.green;
-      entryPrice = lastClose;
-      stopLoss = support * 0.98;
-      takeProfit = lastClose * 1.05;
-    } else if (sellSignals >= 4 && buySignals == 0) {
-      recommendation = "🔴 بيع قوي (إشارات: $sellSignals)";
+      // Entry price for buy: midpoint between current price and support
+      entryPrice = (lastClose + support) / 2;
+      if (entryPrice >= lastClose) {
+        entryPrice = lastClose * 0.995; // Ensure entry price is below current
+      }
+      stopLoss = entryPrice * 0.995; // Stop loss 0.5% below entry
+      takeProfit = entryPrice * 1.015; // Take profit 1.5% above entry
+    } else if (sellSignals > buySignals) {
+      recommendation = "🔴 Sell";
       recommendationColor = Colors.red;
-      entryPrice = lastClose;
-      stopLoss = resistance * 1.02;
-      takeProfit = lastClose * 0.95;
-    } else if (buySignals >= 2 && sellSignals == 0) {
-      recommendation = "🟢 شراء معتدل (إشارات: $buySignals شراء)";
-      recommendationColor = Colors.lightGreen;
-      entryPrice = lastClose;
-      stopLoss = support * 0.98;
-      takeProfit = lastClose * 1.05;
-    } else if (sellSignals >= 2 && buySignals == 0) {
-      recommendation = "🔴 بيع معتدل (إشارات: $sellSignals بيع)";
-      recommendationColor = Colors.red[300]!;
-      entryPrice = lastClose;
-      stopLoss = resistance * 1.02;
-      takeProfit = lastClose * 0.95;
-    } else if (buySignals > sellSignals) {
-      recommendation = "🟢 شراء معتدل (إشارات: $buySignals شراء، $sellSignals بيع)";
-      recommendationColor = Colors.lightGreen;
-      entryPrice = lastClose;
-      stopLoss = support * 0.98;
-      takeProfit = lastClose * 1.05;
+      // Entry price for sell: midpoint between current price and resistance
+      entryPrice = (lastClose + resistance) / 2;
+      if (entryPrice <= lastClose) {
+        entryPrice = lastClose * 1.005; // Ensure entry price is above current
+      }
+      stopLoss = entryPrice * 1.005; // Stop loss 0.5% above entry
+      takeProfit = entryPrice * 0.985; // Take profit 1.5% below entry
     } else {
-      recommendation = "🔴 بيع معتدل (إشارات: $sellSignals بيع، $buySignals شراء)";
-      recommendationColor = Colors.red[300]!;
-      entryPrice = lastClose;
-      stopLoss = resistance * 1.02;
-      takeProfit = lastClose * 0.95;
+      // If total signals are equal, compare strong signals
+      if (strongBuySignals > strongSellSignals) {
+        recommendation = "🟢 Buy";
+        recommendationColor = Colors.green;
+        entryPrice = (lastClose + support) / 2;
+        if (entryPrice >= lastClose) {
+          entryPrice = lastClose * 0.995;
+        }
+        stopLoss = entryPrice * 0.995;
+        takeProfit = entryPrice * 1.015;
+      } else if (strongSellSignals > strongBuySignals) {
+        recommendation = "🔴 Sell";
+        recommendationColor = Colors.red;
+        entryPrice = (lastClose + resistance) / 2;
+        if (entryPrice <= lastClose) {
+          entryPrice = lastClose * 1.005;
+        }
+        stopLoss = entryPrice * 1.005;
+        takeProfit = entryPrice * 0.985;
+      } else {
+        // If strong signals are equal, default based on total signals
+        recommendation = buySignals >= sellSignals ? "🟢 Buy" : "🔴 Sell";
+        recommendationColor = buySignals >= sellSignals ? Colors.green : Colors.red;
+        if (buySignals >= sellSignals) {
+          entryPrice = (lastClose + support) / 2;
+          if (entryPrice >= lastClose) {
+            entryPrice = lastClose * 0.995;
+          }
+          stopLoss = entryPrice * 0.995;
+          takeProfit = entryPrice * 1.015;
+        } else {
+          entryPrice = (lastClose + resistance) / 2;
+          if (entryPrice <= lastClose) {
+            entryPrice = lastClose * 1.005;
+          }
+          stopLoss = entryPrice * 1.005;
+          takeProfit = entryPrice * 0.985;
+        }
+      }
     }
 
     final analysis = [
       if (lastClose > lastSMA * (1 + smaThreshold))
-        "• السعر أعلى من المتوسط المتحرك بـ${((smaThreshold * 100).toStringAsFixed(2))}% (إشارة بيع قوية)"
+        "• Price is above moving average by ${((smaThreshold * 100).toStringAsFixed(2))}% (strong sell signal)"
       else if (lastClose > lastSMA)
-        "• السعر أعلى من المتوسط المتحرك قليلاً (إشارة بيع ضعيفة)"
+        "• Price is slightly above moving average (weak sell signal)"
       else if (lastClose < lastSMA * (1 - smaThreshold))
-        "• السعر أقل من المتوسط المتحرك بـ${((smaThreshold * 100).toStringAsFixed(2))}% (إشارة شراء قوية)"
+        "• Price is below moving average by ${((smaThreshold * 100).toStringAsFixed(2))}% (strong buy signal)"
       else
-        "• السعر أقل من المتوسط المتحرك قليلاً (إشارة شراء ضعيفة)",
+        "• Price is slightly below moving average (weak buy signal)",
       if (rsi > 70)
-        "• RSI في منطقة ذروة الشراء (مفرط في الشراء)"
+        "• RSI in overbought territory (overbought)"
       else if (rsi > 50)
-        "• RSI يشير إلى ميل للبيع"
+        "• RSI indicates selling trend"
       else if (rsi < 30)
-        "• RSI في منطقة ذروة البيع (مفرط في البيع)"
+        "• RSI in oversold territory (oversold)"
       else
-        "• RSI يشير إلى ميل للشراء",
+        "• RSI indicates buying trend",
       if (percentChange > percentChangeThreshold)
-        "• اتجاه صعودي قوي (↑ ${percentChange.toStringAsFixed(2)}%)"
+        "• Strong upward trend (↑ ${percentChange.toStringAsFixed(2)}%)"
       else if (percentChange > 0)
-        "• اتجاه صعودي طفيف (↑ ${percentChange.toStringAsFixed(2)}%)"
+        "• Slight upward trend (↑ ${percentChange.toStringAsFixed(2)}%)"
       else if (percentChange < -percentChangeThreshold)
-        "• اتجاه هبوطي قوي (↓ ${percentChange.abs().toStringAsFixed(2)}%)"
+        "• Strong downward trend (↓ ${percentChange.abs().toStringAsFixed(2)}%)"
       else
-        "• اتجاه هبوطي طفيف (↓ ${percentChange.abs().toStringAsFixed(2)}%)",
+        "• Slight downward trend (↓ ${percentChange.abs().toStringAsFixed(2)}%)",
       if (lastVolume > avgVolume * 1.3)
-        "• حجم التداول أعلى من المتوسط بـ30% (نشاط ملحوظ)"
+        "• Trading volume is 30% above average (significant activity)"
       else if (lastVolume < avgVolume * 0.7)
-        "• حجم التداول أقل من المتوسط بـ30% (نشاط ضعيف)"
+        "• Trading volume is 30% below average (weak activity)"
       else
-        "• حجم التداول قريب من المتوسط",
+        "• Trading volume is close to average",
       if (lastClose <= support * 1.02)
-        "• السعر قريب من مستوى الدعم (إشارة شراء قوية)"
+        "• Price is near support level (strong buy signal)"
       else if (lastClose < (support + resistance) / 2)
-        "• السعر أقرب إلى الدعم (إشارة شراء ضعيفة)"
+        "• Price is closer to support (weak buy signal)"
       else if (lastClose >= resistance * 0.98)
-        "• السعر قريب من مستوى المقاومة (إشارة بيع قوية)"
+        "• Price is near resistance level (strong sell signal)"
       else
-        "• السعر أقرب إلى المقاومة (إشارة بيع ضعيفة)",
-      if (isMacdBuy)
-        "• تقاطع MACD صعودي مع هيستوغرام إيجابي (إشارة شراء قوية)"
-      else if (macdLine.isNotEmpty && signalLine.isNotEmpty && macdLine.last > signalLine.last)
-        "• MACD يشير إلى ميل صعودي (إشارة شراء ضعيفة)"
-      else if (isMacdSell)
-        "• تقاطع MACD هبوطي مع هيستوغرام سلبي (إشارة بيع قوية)"
-      else
-        "• MACD يشير إلى ميل هبوطي (إشارة بيع ضعيفة)",
-      "• مستوى الدعم الحالي: ${support.toStringAsFixed(2)} دولار",
-      "• مستوى المقاومة الحالي: ${resistance.toStringAsFixed(2)} دولار",
-      "• متوسط النطاق الحقيقي (ATR): ${atr.toStringAsFixed(2)} دولار",
+        "• Price is closer to resistance (weak sell signal)",
+      // Add detailed MACD analysis
+      ...macdAnalysis,
+      "• Current support level: ${support.toStringAsFixed(2)} USD",
+      "• Current resistance level: ${resistance.toStringAsFixed(2)} USD",
+      "• Average True Range (ATR): ${atr.toStringAsFixed(2)} USD",
     ];
 
     return CommodityRecommendation(
@@ -548,7 +622,7 @@ class _CommoditiesRecommendationState extends State<CommoditiesRecommendation> w
         builder: (context) {
           switch (index) {
             case 0:
-              return const Recommendations();
+              return const StockRecommendationPage();
             case 2:
               return const ForexRecommendationPage();
             case 3:
@@ -650,7 +724,7 @@ class _CommoditiesRecommendationState extends State<CommoditiesRecommendation> w
             child: _loadingCommodities
                 ? const Center(child: CircularProgressIndicator())
                 : commodityRecommendations.isEmpty
-                    ? const Center(child: Text('فشل جلب البيانات. تحقق من الاتصال وحاول مجددًا.'))
+                    ? const Center(child: Text('Failed to fetch data. Check connection and try again.'))
                     : ListView.builder(
                         itemCount: commodityRecommendations.length,
                         itemBuilder: (context, index) {
@@ -692,7 +766,7 @@ class _CommoditiesRecommendationState extends State<CommoditiesRecommendation> w
               Row(
                 children: [
                   Icon(
-                    commodity.recommendation.contains('شراء')
+                    commodity.recommendation.contains('Buy')
                         ? Icons.trending_up
                         : Icons.trending_down,
                     color: commodity.recommendationColor,
@@ -722,7 +796,7 @@ class _CommoditiesRecommendationState extends State<CommoditiesRecommendation> w
                   ),
                   Chip(
                     label: Text(
-                      commodity.recommendation.split('(')[0].trim(),
+                      commodity.recommendation,
                       style: TextStyle(color: commodity.recommendationColor),
                     ),
                     backgroundColor: commodity.recommendationColor.withOpacity(0.1),
@@ -734,11 +808,11 @@ class _CommoditiesRecommendationState extends State<CommoditiesRecommendation> w
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'السعر: \$${commodity.currentPrice.toStringAsFixed(2)}',
+                    'Price: \$${commodity.currentPrice.toStringAsFixed(2)}',
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   Text(
-                    'التغير: ${commodity.changePercent.toStringAsFixed(2)}%',
+                    'Change: ${commodity.changePercent.toStringAsFixed(2)}%',
                     style: TextStyle(
                       color: commodity.changePercent >= 0 ? Colors.green : Colors.red,
                       fontWeight: FontWeight.bold,
@@ -750,7 +824,7 @@ class _CommoditiesRecommendationState extends State<CommoditiesRecommendation> w
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('المتوسط: \$${commodity.sma.toStringAsFixed(2)}'),
+                  Text('Average: \$${commodity.sma.toStringAsFixed(2)}'),
                   Text('RSI: ${commodity.rsi.toStringAsFixed(1)}'),
                 ],
               ),
@@ -758,41 +832,45 @@ class _CommoditiesRecommendationState extends State<CommoditiesRecommendation> w
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _buildSignalChip('إشارات شراء', commodity.buySignals, Colors.green),
-                  _buildSignalChip('إشارات بيع', commodity.sellSignals, Colors.red),
+                  _buildSignalChip('Buy Signals', commodity.buySignals, Colors.green),
+                  _buildSignalChip('Sell Signals', commodity.sellSignals, Colors.red),
                 ],
               ),
               const SizedBox(height: 8),
               Text(
-                'الشروط المحققة:',
+                'Met Conditions:',
                 style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[700]),
               ),
               Column(
-                children: commodity.conditions.map((condition) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2),
-                  child: Row(
-                    children: [
-                      Icon(
-                        condition.contains("شراء") ? Icons.arrow_upward : Icons.arrow_downward,
-                        color: condition.contains("قوي")
-                            ? (condition.contains("شراء") ? Colors.green : Colors.red)
-                            : (condition.contains("شراء") ? Colors.green[300] : Colors.red[300]),
-                        size: 16,
-                      ),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          condition,
-                          style: TextStyle(
-                            color: condition.contains("قوي")
-                                ? (condition.contains("شراء") ? Colors.green : Colors.red)
-                                : (condition.contains("شراء") ? Colors.green[300] : Colors.red[300]),
+                children: commodity.conditions
+                    .map((condition) => Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 2),
+                          child: Row(
+                            children: [
+                              Icon(
+                                condition.contains("Buy")
+                                    ? Icons.arrow_upward
+                                    : Icons.arrow_downward,
+                                color: condition.contains("Strong")
+                                    ? (condition.contains("Buy") ? Colors.green : Colors.red)
+                                    : (condition.contains("Buy") ? Colors.green[300] : Colors.red[300]),
+                                size: 16,
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  condition,
+                                  style: TextStyle(
+                                    color: condition.contains("Strong")
+                                        ? (condition.contains("Buy") ? Colors.green : Colors.red)
+                                        : (condition.contains("Buy") ? Colors.green[300] : Colors.red[300]),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ),
-                    ],
-                  ),
-                )).toList(),
+                        ))
+                    .toList(),
               ),
             ],
           ),

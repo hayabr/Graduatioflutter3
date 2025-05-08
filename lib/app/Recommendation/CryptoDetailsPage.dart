@@ -39,6 +39,7 @@ class _CryptoDetailsPageState extends State<CryptoDetailsPage> {
   List<CryptoMACDPoint> macdHistory = [];
   bool isLoading = true;
   double fallbackSupport = 0;
+  double fallbackResistance = 0;
 
   @override
   void initState() {
@@ -66,38 +67,53 @@ class _CryptoDetailsPageState extends State<CryptoDetailsPage> {
         final timestamps = result['timestamp'] as List<dynamic>;
         final closes = result['indicators']['quote'][0]['close'] as List<dynamic>;
         final lows = result['indicators']['quote'][0]['low'] as List<dynamic>;
+        final highs = result['indicators']['quote'][0]['high'] as List<dynamic>;
 
         final List<CryptoPricePoint> points = [];
         final List<double> validCloses = [];
         final List<double> validLows = [];
+        final List<double> validHighs = [];
 
-        // Collect valid data
         for (int i = 0; i < timestamps.length; i++) {
-          if (closes[i] != null && lows[i] != null) {
+          if (closes[i] != null && lows[i] != null && highs[i] != null) {
             points.add(CryptoPricePoint(
               date: DateTime.fromMillisecondsSinceEpoch(timestamps[i] * 1000),
               price: closes[i].toDouble(),
             ));
             validCloses.add(closes[i].toDouble());
             validLows.add(lows[i].toDouble());
+            validHighs.add(highs[i].toDouble());
           }
         }
 
-        // Ensure enough data for MACD
         if (validCloses.length < 26) {
           print('Not enough data for MACD: ${validCloses.length} points');
+          List<double> supports = validLows
+              .where((low) => validLows.where((l) => l <= low * 1.01 && l >= low * 0.99).length >= 3)
+              .toList();
+          fallbackSupport = supports.isNotEmpty
+              ? supports.reduce((a, b) => a < b ? a : b)
+              : validLows.isNotEmpty
+                  ? validLows.reduce((a, b) => a < b ? a : b)
+                  : widget.crypto.support;
+
+          List<double> resistances = validHighs
+              .where((high) => validHighs.where((h) => h <= high * 1.01 && h >= high * 0.99).length >= 3)
+              .toList();
+          fallbackResistance = resistances.isNotEmpty
+              ? resistances.reduce((a, b) => a > b ? a : b)
+              : validHighs.isNotEmpty
+                  ? validHighs.reduce((a, b) => a > b ? a : b)
+                  : widget.crypto.resistance;
+
           setState(() {
             priceHistory = points;
             macdHistory = [];
-            fallbackSupport = validLows.isNotEmpty
-                ? validLows.reduce((a, b) => a < b ? a : b)
-                : widget.crypto.support;
             isLoading = false;
           });
           return;
         }
 
-        // Calculate MACD
         final macdData = _calculateMACD(validCloses);
         final macdPoints = <CryptoMACDPoint>[];
         final macdLine = macdData['macdLine']!;
@@ -111,12 +127,23 @@ class _CryptoDetailsPageState extends State<CryptoDetailsPage> {
           ));
         }
 
+        List<double> supports = validLows
+            .where((low) => validLows.where((l) => l <= low * 1.01 && l >= low * 0.99).length >= 3)
+            .toList();
+        fallbackSupport = supports.isNotEmpty
+            ? supports.reduce((a, b) => a < b ? a : b)
+            : validLows.reduce((a, b) => a < b ? a : b);
+
+        List<double> resistances = validHighs
+            .where((high) => validHighs.where((h) => h <= high * 1.01 && h >= high * 0.99).length >= 3)
+            .toList();
+        fallbackResistance = resistances.isNotEmpty
+            ? resistances.reduce((a, b) => a > b ? a : b)
+            : validHighs.reduce((a, b) => a > b ? a : b);
+
         setState(() {
           priceHistory = points;
           macdHistory = macdPoints;
-          fallbackSupport = validLows.isNotEmpty
-              ? validLows.reduce((a, b) => a < b ? a : b)
-              : widget.crypto.support;
           isLoading = false;
         });
       } else {
@@ -130,9 +157,10 @@ class _CryptoDetailsPageState extends State<CryptoDetailsPage> {
         priceHistory = [];
         macdHistory = [];
         fallbackSupport = widget.crypto.support;
+        fallbackResistance = widget.crypto.resistance;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('خطأ في تحميل البيانات: $e')),
+        SnackBar(content: Text('Error loading data: $e')),
       );
     }
   }
@@ -247,8 +275,17 @@ class _CryptoDetailsPageState extends State<CryptoDetailsPage> {
   }
 
   Widget _buildRecommendationCard() {
+    Color cardColor;
+    if (widget.crypto.recommendation.contains('🟢')) {
+      cardColor = Colors.green.withOpacity(0.1);
+    } else if (widget.crypto.recommendation.contains('🔴')) {
+      cardColor = Colors.red.withOpacity(0.1);
+    } else {
+      cardColor = Colors.blue.withOpacity(0.1);
+    }
+
     return Card(
-      color: widget.crypto.recommendationColor.withOpacity(0.1),
+      color: cardColor,
       elevation: 4,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
@@ -259,7 +296,7 @@ class _CryptoDetailsPageState extends State<CryptoDetailsPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'التوصية',
+              'Recommendation',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -272,7 +309,7 @@ class _CryptoDetailsPageState extends State<CryptoDetailsPage> {
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
-                color: widget.crypto.recommendationColor,
+                color: _getRecommendationColor(widget.crypto.recommendation),
               ),
             ),
           ],
@@ -293,7 +330,7 @@ class _CryptoDetailsPageState extends State<CryptoDetailsPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'سجل الأسعار',
+              'Price History',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -306,7 +343,7 @@ class _CryptoDetailsPageState extends State<CryptoDetailsPage> {
               child: isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : priceHistory.isEmpty
-                      ? const Center(child: Text('لا توجد بيانات أسعار متاحة'))
+                      ? const Center(child: Text('No price data available'))
                       : LineChart(
                           LineChartData(
                             gridData: const FlGridData(show: true),
@@ -317,7 +354,7 @@ class _CryptoDetailsPageState extends State<CryptoDetailsPage> {
                                   reservedSize: 40,
                                   getTitlesWidget: (value, meta) {
                                     return Text(
-                                      '\$${value.toStringAsFixed(2)}',
+                                      _formatNumber(value),
                                       style: const TextStyle(
                                         fontSize: 10,
                                         color: Colors.grey,
@@ -384,12 +421,12 @@ class _CryptoDetailsPageState extends State<CryptoDetailsPage> {
                                         fontSize: 12,
                                       ),
                                       labelResolver: (line) =>
-                                          'الدعم: \$${line.y.toStringAsFixed(2)}',
+                                          'Support: ${_formatNumber(line.y)}',
                                     ),
                                   ),
-                                if (widget.crypto.resistance > 0)
+                                if (fallbackResistance > 0)
                                   HorizontalLine(
-                                    y: widget.crypto.resistance,
+                                    y: fallbackResistance,
                                     color: Colors.red,
                                     strokeWidth: 2,
                                     dashArray: [8, 4],
@@ -401,7 +438,7 @@ class _CryptoDetailsPageState extends State<CryptoDetailsPage> {
                                         fontSize: 12,
                                       ),
                                       labelResolver: (line) =>
-                                          'المقاومة: \$${line.y.toStringAsFixed(2)}',
+                                          'Resistance: ${_formatNumber(line.y)}',
                                     ),
                                   ),
                               ],
@@ -414,20 +451,18 @@ class _CryptoDetailsPageState extends State<CryptoDetailsPage> {
                                             ? fallbackSupport
                                             : double.infinity]
                                       ..removeWhere((e) => e == double.infinity))
-                                    .reduce((a, b) => a < b ? a : b) *
-                                0.95
+                                    .reduce((a, b) => a < b ? a : b) * 0.95
                                 : 0,
                             maxY: priceHistory.isNotEmpty
                                 ? ([priceHistory
                                             .map((p) => p.price)
                                             .reduce((a, b) => a > b ? a : b),
-                                        widget.crypto.resistance > 0
-                                            ? widget.crypto.resistance
+                                        fallbackResistance > 0
+                                            ? fallbackResistance
                                             : double.negativeInfinity]
                                       ..removeWhere(
                                           (e) => e == double.negativeInfinity))
-                                    .reduce((a, b) => a > b ? a : b) *
-                                1.05
+                                    .reduce((a, b) => a > b ? a : b) * 1.05
                                 : 0,
                           ),
                         ),
@@ -439,6 +474,65 @@ class _CryptoDetailsPageState extends State<CryptoDetailsPage> {
   }
 
   Widget _buildMACDChart() {
+    final latestMACD = macdHistory.isNotEmpty ? macdHistory.last : null;
+    final isBullish = latestMACD != null && latestMACD.histogram > 0;
+    final isBearish = latestMACD != null && latestMACD.histogram < 0;
+    final isCrossOver = macdHistory.length >= 2 &&
+        ((macdHistory[macdHistory.length - 2].histogram <= 0 && isBullish) ||
+            (macdHistory[macdHistory.length - 2].histogram >= 0 && isBearish));
+    final isTrendingUp = macdHistory.length >= 3 &&
+        macdHistory[macdHistory.length - 3].macdLine <
+            macdHistory[macdHistory.length - 2].macdLine &&
+        macdHistory[macdHistory.length - 2].macdLine <
+            macdHistory[macdHistory.length - 1].macdLine;
+    final isTrendingDown = macdHistory.length >= 3 &&
+        macdHistory[macdHistory.length - 3].macdLine >
+            macdHistory[macdHistory.length - 2].macdLine &&
+        macdHistory[macdHistory.length - 2].macdLine >
+            macdHistory[macdHistory.length - 1].macdLine;
+
+    List<String> macdAnalysis = [];
+    if (isCrossOver) {
+      if (isBullish) {
+        macdAnalysis.add("Strong bullish crossover: MACD line crossed above signal line with positive histogram (strong buy signal).");
+      } else {
+        macdAnalysis.add("Strong bearish crossover: MACD line crossed below signal line with negative histogram (strong sell signal).");
+      }
+    } else if (latestMACD != null && latestMACD.macdLine > latestMACD.signalLine) {
+      macdAnalysis.add("Bullish trend: MACD line is above signal line, indicating bullish momentum (weak buy signal).");
+    } else if (latestMACD != null && latestMACD.macdLine < latestMACD.signalLine) {
+      macdAnalysis.add("Bearish trend: MACD line is below signal line, indicating bearish momentum (weak sell signal).");
+    }
+
+    if (isTrendingUp) {
+      macdAnalysis.add("Sustained bullish momentum: MACD line has been rising for the last three periods.");
+    } else if (isTrendingDown) {
+      macdAnalysis.add("Sustained bearish momentum: MACD line has been declining for the last three periods.");
+    }
+
+    if (latestMACD != null && latestMACD.histogram.abs() > 0.5) {
+      macdAnalysis.add("Strong momentum: Histogram shows a large value (${_formatNumber(latestMACD.histogram)}), indicating a strong trend.");
+    } else if (latestMACD != null) {
+      macdAnalysis.add("Moderate momentum: Histogram shows a small value (${_formatNumber(latestMACD.histogram)}), indicating a non-strong trend.");
+    }
+
+    final minY = macdHistory.isNotEmpty
+        ? [
+            macdHistory.map((p) => p.macdLine).reduce((a, b) => a < b ? a : b),
+            macdHistory.map((p) => p.signalLine).reduce((a, b) => a < b ? a : b),
+            macdHistory.map((p) => p.histogram).reduce((a, b) => a < b ? a : b),
+            0.0
+          ].reduce((a, b) => a < b ? a : b) * 1.1
+        : -1.0;
+    final maxY = macdHistory.isNotEmpty
+        ? [
+            macdHistory.map((p) => p.macdLine).reduce((a, b) => a > b ? a : b),
+            macdHistory.map((p) => p.signalLine).reduce((a, b) => a > b ? a : b),
+            macdHistory.map((p) => p.histogram).reduce((a, b) => a > b ? a : b),
+            0.0
+          ].reduce((a, b) => a > b ? a : b) * 1.1
+        : 1.0;
+
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(
@@ -450,7 +544,7 @@ class _CryptoDetailsPageState extends State<CryptoDetailsPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'مؤشر MACD',
+              'MACD Indicator',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -459,94 +553,218 @@ class _CryptoDetailsPageState extends State<CryptoDetailsPage> {
             ),
             const SizedBox(height: 10),
             SizedBox(
-              height: 150,
+              height: 200,
               child: isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : macdHistory.isEmpty
-                      ? const Center(
-                          child: Text('فشل تحميل MACD: بيانات غير كافية'))
-                      : LineChart(
-                          LineChartData(
-                            gridData: FlGridData(show: true),
-                            titlesData: FlTitlesData(
-                              leftTitles: AxisTitles(
-                                sideTitles: SideTitles(
-                                  showTitles: true,
-                                  reservedSize: 40,
-                                  getTitlesWidget: (value, meta) {
-                                    return Text(
-                                      value.toStringAsFixed(2),
-                                      style: const TextStyle(
-                                        fontSize: 10,
-                                        color: Colors.grey,
+                      ? const Center(child: Text('Failed to load MACD: Insufficient data'))
+                      : Stack(
+                          children: [
+                            BarChart(
+                              BarChartData(
+                                barGroups: macdHistory.asMap().entries.map((entry) {
+                                  final index = entry.key;
+                                  final point = entry.value;
+                                  return BarChartGroupData(
+                                    x: index,
+                                    barRods: [
+                                      BarChartRodData(
+                                        toY: point.histogram,
+                                        fromY: 0,
+                                        color: point.histogram > 0
+                                            ? Colors.green.withOpacity(0.5)
+                                            : Colors.red.withOpacity(0.5),
+                                        width: 1.0,
+                                        borderRadius: BorderRadius.zero,
                                       ),
-                                    );
-                                  },
-                                ),
-                              ),
-                              bottomTitles: const AxisTitles(
-                                sideTitles: SideTitles(showTitles: false),
-                              ),
-                              topTitles: const AxisTitles(
-                                sideTitles: SideTitles(showTitles: false),
-                              ),
-                              rightTitles: const AxisTitles(
-                                sideTitles: SideTitles(showTitles: false),
+                                    ],
+                                  );
+                                }).toList(),
+                                gridData: const FlGridData(show: false),
+                                titlesData: const FlTitlesData(show: false),
+                                borderData: FlBorderData(show: false),
+                                alignment: BarChartAlignment.spaceBetween,
+                                barTouchData: BarTouchData(enabled: false),
+                                minY: minY,
+                                maxY: maxY,
                               ),
                             ),
-                            borderData: FlBorderData(show: true),
-                            lineBarsData: [
-                              LineChartBarData(
-                                spots: macdHistory
-                                    .map((p) =>
-                                        FlSpot(p.index.toDouble(), p.macdLine))
-                                    .toList(),
-                                isCurved: false,
-                                color: Colors.blue,
-                                barWidth: 2,
-                                dotData: const FlDotData(show: false),
-                              ),
-                              LineChartBarData(
-                                spots: macdHistory
-                                    .map((p) => FlSpot(
-                                        p.index.toDouble(), p.signalLine))
-                                    .toList(),
-                                isCurved: false,
-                                color: Colors.yellow,
-                                barWidth: 2,
-                                dotData: const FlDotData(show: false),
-                              ),
-                            ],
-                            extraLinesData: ExtraLinesData(
-                              horizontalLines: [
-                                HorizontalLine(
-                                  y: 0,
-                                  color: Colors.grey,
-                                  strokeWidth: 1,
-                                  dashArray: [5, 5],
+                            LineChart(
+                              LineChartData(
+                                gridData: const FlGridData(show: true),
+                                titlesData: FlTitlesData(
+                                  leftTitles: AxisTitles(
+                                    sideTitles: SideTitles(
+                                      showTitles: true,
+                                      reservedSize: 40,
+                                      getTitlesWidget: (value, meta) {
+                                        return Text(
+                                          _formatNumber(value),
+                                          style: const TextStyle(
+                                            fontSize: 10,
+                                            color: Colors.grey,
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                  bottomTitles: const AxisTitles(
+                                    sideTitles: SideTitles(showTitles: false),
+                                  ),
+                                  topTitles: const AxisTitles(
+                                    sideTitles: SideTitles(showTitles: false),
+                                  ),
+                                  rightTitles: const AxisTitles(
+                                    sideTitles: SideTitles(showTitles: false),
+                                  ),
                                 ),
-                              ],
+                                borderData: FlBorderData(show: true),
+                                lineBarsData: [
+                                  LineChartBarData(
+                                    spots: macdHistory
+                                        .map((p) =>
+                                            FlSpot(p.index.toDouble(), p.macdLine))
+                                        .toList(),
+                                    isCurved: false,
+                                    color: Colors.blue,
+                                    barWidth: 2,
+                                    dotData: const FlDotData(show: false),
+                                  ),
+                                  LineChartBarData(
+                                    spots: macdHistory
+                                        .map((p) => FlSpot(
+                                            p.index.toDouble(), p.signalLine))
+                                        .toList(),
+                                    isCurved: false,
+                                    color: Colors.yellow,
+                                    barWidth: 2,
+                                    dotData: const FlDotData(show: false),
+                                  ),
+                                ],
+                                extraLinesData: ExtraLinesData(
+                                  horizontalLines: [
+                                    HorizontalLine(
+                                      y: 0,
+                                      color: Colors.grey,
+                                      strokeWidth: 1,
+                                      dashArray: [5, 5],
+                                    ),
+                                  ],
+                                ),
+                                minY: minY,
+                                maxY: maxY,
+                              ),
                             ),
-                            minY: macdHistory.isNotEmpty
-                                ? macdHistory
-                                    .map((p) => [p.macdLine, p.signalLine]
-                                        .reduce((a, b) => a < b ? a : b))
-                                    .reduce((a, b) => a < b ? a : b) *
-                                1.1
-                                : -1,
-                            maxY: macdHistory.isNotEmpty
-                                ? macdHistory
-                                    .map((p) => [p.macdLine, p.signalLine]
-                                        .reduce((a, b) => a > b ? a : b))
-                                    .reduce((a, b) => a > b ? a : b) *
-                                1.1
-                                : 1,
-                          ),
+                          ],
                         ),
             ),
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildLegendItem("MACD Line", Colors.blue),
+                const SizedBox(width: 16),
+                _buildLegendItem("Signal Line", Colors.yellow),
+                const SizedBox(width: 16),
+                _buildLegendItem("Histogram", Colors.green),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Detailed MACD Analysis',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[800],
+              ),
+            ),
+            const SizedBox(height: 8),
+            if (macdAnalysis.isEmpty)
+              const Text(
+                'Insufficient data for MACD analysis.',
+                style: TextStyle(fontSize: 14, color: Colors.grey),
+              )
+            else
+              ...macdAnalysis.map((analysis) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('•', style: TextStyle(fontSize: 14)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            analysis,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: analysis.contains("buy")
+                                  ? Colors.green
+                                  : analysis.contains("sell")
+                                      ? Colors.red
+                                      : Colors.black,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )),
+            if (latestMACD != null) ...[
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildIndicatorValue("MACD Line", latestMACD.macdLine, Colors.blue),
+                  _buildIndicatorValue("Signal Line", latestMACD.signalLine, Colors.yellow),
+                  _buildIndicatorValue(
+                    "Histogram",
+                    latestMACD.histogram,
+                    latestMACD.histogram > 0 ? Colors.green : Colors.red,
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildLegendItem(String label, Color color) {
+    return Row(
+      children: [
+        Container(
+          width: 12,
+          height: 12,
+          color: color,
+        ),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 12),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildIndicatorValue(String label, double value, Color color) {
+    return Column(
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey[600],
+          ),
+        ),
+        Text(
+          _formatNumber(value),
+          style: TextStyle(
+            fontSize: 14,
+            color: color,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
     );
   }
 
@@ -564,11 +782,11 @@ class _CryptoDetailsPageState extends State<CryptoDetailsPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'السعر الحالي',
+                  'Current Price',
                   style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                 ),
                 Text(
-                  '\$${_formatNumber(widget.crypto.currentPrice)}',
+                  _formatNumber(widget.crypto.currentPrice),
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
               ],
@@ -578,7 +796,7 @@ class _CryptoDetailsPageState extends State<CryptoDetailsPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'التغير',
+                  'Change',
                   style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                 ),
                 Text(
@@ -598,11 +816,11 @@ class _CryptoDetailsPageState extends State<CryptoDetailsPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'المتوسط المتحرك (14 يوم)',
+                  'Moving Average (14 days)',
                   style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                 ),
                 Text(
-                  '\$${_formatNumber(widget.crypto.sma)}',
+                  _formatNumber(widget.crypto.sma),
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
               ],
@@ -612,11 +830,11 @@ class _CryptoDetailsPageState extends State<CryptoDetailsPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'مؤشر القوة النسبية (RSI)',
+                  'Relative Strength Index (RSI)',
                   style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                 ),
                 Text(
-                  widget.crypto.rsi.toStringAsFixed(1),
+                  widget.crypto.rsi.toStringAsFixed(2),
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -630,11 +848,12 @@ class _CryptoDetailsPageState extends State<CryptoDetailsPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'حجم التداول الأخير',
+                  'Support',
                   style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                 ),
                 Text(
-                  _formatNumber(widget.crypto.lastVolume.toDouble()),
+                  _formatNumber(
+                      fallbackSupport > 0 ? fallbackSupport : widget.crypto.support),
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
               ],
@@ -644,39 +863,12 @@ class _CryptoDetailsPageState extends State<CryptoDetailsPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'متوسط الحجم',
+                  'Resistance',
                   style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                 ),
                 Text(
-                  _formatNumber(widget.crypto.avgVolume.toDouble()),
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            const Divider(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'الدعم',
-                  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                ),
-                Text(
-                  '\$${_formatNumber(fallbackSupport > 0 ? fallbackSupport : widget.crypto.support)}',
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            const Divider(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'المقاومة',
-                  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                ),
-                Text(
-                  '\$${_formatNumber(widget.crypto.resistance)}',
+                  _formatNumber(
+                      fallbackResistance > 0 ? fallbackResistance : widget.crypto.resistance),
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
               ],
@@ -688,6 +880,9 @@ class _CryptoDetailsPageState extends State<CryptoDetailsPage> {
   }
 
   Widget _buildConditionsSection() {
+    final conditions = widget.crypto.conditions;
+    if (conditions.isEmpty) return Container();
+
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(
@@ -699,7 +894,7 @@ class _CryptoDetailsPageState extends State<CryptoDetailsPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'الشروط المحققة',
+              'Met Conditions',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -707,15 +902,15 @@ class _CryptoDetailsPageState extends State<CryptoDetailsPage> {
               ),
             ),
             const SizedBox(height: 10),
-            ...widget.crypto.conditions.map((condition) => Padding(
+            ...conditions.map((condition) => Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Row(
                     children: [
                       Icon(
-                        condition.contains("شراء")
+                        condition.contains("Buy")
                             ? Icons.arrow_upward
                             : Icons.arrow_downward,
-                        color: condition.contains("شراء")
+                        color: condition.contains("Buy")
                             ? Colors.green
                             : Colors.red,
                         size: 20,
@@ -726,7 +921,7 @@ class _CryptoDetailsPageState extends State<CryptoDetailsPage> {
                           condition,
                           style: TextStyle(
                             fontSize: 16,
-                            color: condition.contains("شراء")
+                            color: condition.contains("Buy")
                                 ? Colors.green
                                 : Colors.red,
                           ),
@@ -753,7 +948,7 @@ class _CryptoDetailsPageState extends State<CryptoDetailsPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'تحليل مفصل',
+              'Detailed Analysis',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -773,9 +968,9 @@ class _CryptoDetailsPageState extends State<CryptoDetailsPage> {
                           item,
                           style: TextStyle(
                             fontSize: 16,
-                            color: item.contains("شراء")
+                            color: item.contains("buy")
                                 ? Colors.green
-                                : item.contains("بيع")
+                                : item.contains("sell")
                                     ? Colors.red
                                     : Colors.black,
                           ),
@@ -808,7 +1003,7 @@ class _CryptoDetailsPageState extends State<CryptoDetailsPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'إستراتيجية التداول المقترحة',
+              'Suggested Trading Strategy',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -820,11 +1015,11 @@ class _CryptoDetailsPageState extends State<CryptoDetailsPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'سعر الدخول',
+                  'Entry Price',
                   style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                 ),
                 Text(
-                  '\$${_formatNumber(widget.crypto.entryPrice!)}',
+                  _formatNumber(widget.crypto.entryPrice!),
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -837,11 +1032,11 @@ class _CryptoDetailsPageState extends State<CryptoDetailsPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'وقف الخسارة',
+                  'Stop Loss',
                   style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                 ),
                 Text(
-                  '\$${_formatNumber(widget.crypto.stopLoss!)}',
+                  _formatNumber(widget.crypto.stopLoss!),
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -855,11 +1050,11 @@ class _CryptoDetailsPageState extends State<CryptoDetailsPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'جني الأرباح',
+                  'Take Profit',
                   style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                 ),
                 Text(
-                  '\$${_formatNumber(widget.crypto.takeProfit!)}',
+                  _formatNumber(widget.crypto.takeProfit!),
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -880,8 +1075,16 @@ class _CryptoDetailsPageState extends State<CryptoDetailsPage> {
     return Colors.black;
   }
 
+  Color _getRecommendationColor(String recommendation) {
+    if (recommendation.contains('🟢')) return Colors.green;
+    if (recommendation.contains('🔴')) return Colors.red;
+    return Colors.blue;
+  }
+
   String _formatNumber(double num) {
-    String formatted = num.toStringAsFixed(2);
+    // Use 4 decimal places for prices below $10, 2 for others
+    int decimalPlaces = num < 10 ? 4 : 2;
+    String formatted = num.toStringAsFixed(decimalPlaces);
     final parts = formatted.split('.');
     final integerPart = parts[0].replaceAllMapped(
       RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),

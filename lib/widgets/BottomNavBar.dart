@@ -70,7 +70,7 @@ class BottomNavBar extends StatelessWidget {
           case 3:
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (context) => const Recommendations()),
+              MaterialPageRoute(builder: (context) => const StockRecommendationPage()),
             );
             break;
           case 4:
