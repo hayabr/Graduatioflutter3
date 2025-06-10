@@ -2,22 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:graduationproject/app/Recommendation/forex_recommendation.dart';
+import 'package:graduationproject/app/Recommendation/commodities_recommendation.dart';
 
-class ForexPricePoint {
+class CommodityPricePoint {
   final DateTime date;
   final double price;
 
-  ForexPricePoint({required this.date, required this.price});
+  CommodityPricePoint({required this.date, required this.price});
 }
 
-class ForexMACDPoint {
+class CommodityMACDPoint {
   final int index;
   final double macdLine;
   final double signalLine;
   final double histogram;
 
-  ForexMACDPoint({
+  CommodityMACDPoint({
     required this.index,
     required this.macdLine,
     required this.signalLine,
@@ -25,21 +25,21 @@ class ForexMACDPoint {
   });
 }
 
-class ForexDetailsPage extends StatefulWidget {
-  final ForexRecommendation forex;
+class CommodityDetailsPage extends StatefulWidget {
+  final CommodityRecommendation commodity;
 
-  const ForexDetailsPage({super.key, required this.forex});
+  const CommodityDetailsPage({super.key, required this.commodity});
 
   @override
-  ForexDetailsPageState createState() => ForexDetailsPageState();
+  CommodityDetailsPageState createState() => CommodityDetailsPageState();
 }
 
-class ForexDetailsPageState extends State<ForexDetailsPage> {
-  List<ForexPricePoint> priceHistory = [];
-  List<ForexMACDPoint> macdHistory = [];
+class CommodityDetailsPageState extends State<CommodityDetailsPage> {
+  List<CommodityPricePoint> priceHistory = [];
+  List<CommodityMACDPoint> macdHistory = [];
   bool isLoading = true;
   double fallbackSupport = 0;
-  double fallbackResistance = 0; // New variable to store calculated resistance
+  double fallbackResistance = 0;
 
   @override
   void initState() {
@@ -53,7 +53,7 @@ class ForexDetailsPageState extends State<ForexDetailsPage> {
     });
 
     try {
-      String symbol = widget.forex.symbol;
+      String symbol = widget.commodity.symbol;
       final response = await http.get(
         Uri.parse(
           'https://query1.finance.yahoo.com/v8/finance/chart/$symbol?range=3mo&interval=1d',
@@ -69,14 +69,14 @@ class ForexDetailsPageState extends State<ForexDetailsPage> {
         final lows = result['indicators']['quote'][0]['low'] as List<dynamic>;
         final highs = result['indicators']['quote'][0]['high'] as List<dynamic>;
 
-        final List<ForexPricePoint> points = [];
+        final List<CommodityPricePoint> points = [];
         final List<double> validCloses = [];
         final List<double> validLows = [];
         final List<double> validHighs = [];
 
         for (int i = 0; i < timestamps.length; i++) {
           if (closes[i] != null && lows[i] != null && highs[i] != null) {
-            points.add(ForexPricePoint(
+            points.add(CommodityPricePoint(
               date: DateTime.fromMillisecondsSinceEpoch(timestamps[i] * 1000),
               price: closes[i].toDouble(),
             ));
@@ -88,7 +88,6 @@ class ForexDetailsPageState extends State<ForexDetailsPage> {
 
         if (validCloses.length < 26) {
           debugPrint('Not enough data for MACD: ${validCloses.length} points');
-          // Calculate support using frequency
           List<double> supports = validLows
               .where((low) => validLows.where((l) => l <= low * 1.01 && l >= low * 0.99).length >= 3)
               .toList();
@@ -96,9 +95,8 @@ class ForexDetailsPageState extends State<ForexDetailsPage> {
               ? supports.reduce((a, b) => a < b ? a : b)
               : validLows.isNotEmpty
                   ? validLows.reduce((a, b) => a < b ? a : b)
-                  : widget.forex.support;
+                  : widget.commodity.support;
 
-          // Calculate resistance using frequency
           List<double> resistances = validHighs
               .where((high) => validHighs.where((h) => h <= high * 1.01 && h >= high * 0.99).length >= 3)
               .toList();
@@ -106,7 +104,7 @@ class ForexDetailsPageState extends State<ForexDetailsPage> {
               ? resistances.reduce((a, b) => a > b ? a : b)
               : validHighs.isNotEmpty
                   ? validHighs.reduce((a, b) => a > b ? a : b)
-                  : widget.forex.resistance;
+                  : widget.commodity.resistance;
 
           setState(() {
             priceHistory = points;
@@ -117,11 +115,11 @@ class ForexDetailsPageState extends State<ForexDetailsPage> {
         }
 
         final macdData = _calculateMACD(validCloses);
-        final macdPoints = <ForexMACDPoint>[];
+        final macdPoints = <CommodityMACDPoint>[];
         final macdLine = macdData['macdLine']!;
         final signalLine = macdData['signalLine']!;
         for (int i = 0; i < macdLine.length && i < signalLine.length; i++) {
-          macdPoints.add(ForexMACDPoint(
+          macdPoints.add(CommodityMACDPoint(
             index: i,
             macdLine: macdLine[i],
             signalLine: signalLine[i],
@@ -129,7 +127,6 @@ class ForexDetailsPageState extends State<ForexDetailsPage> {
           ));
         }
 
-        // Calculate support using frequency
         List<double> supports = validLows
             .where((low) => validLows.where((l) => l <= low * 1.01 && l >= low * 0.99).length >= 3)
             .toList();
@@ -137,7 +134,6 @@ class ForexDetailsPageState extends State<ForexDetailsPage> {
             ? supports.reduce((a, b) => a < b ? a : b)
             : validLows.reduce((a, b) => a < b ? a : b);
 
-        // Calculate resistance using frequency
         List<double> resistances = validHighs
             .where((high) => validHighs.where((h) => h <= high * 1.01 && h >= high * 0.99).length >= 3)
             .toList();
@@ -151,22 +147,23 @@ class ForexDetailsPageState extends State<ForexDetailsPage> {
           isLoading = false;
         });
       } else {
-       debugPrint('Failed to fetch price history: ${response.statusCode}');
+        debugPrint('Failed to fetch price history: ${response.statusCode}');
         throw Exception('Failed to load price history');
       }
     } catch (e) {
-      //print('Error loading price history: $e');
+      debugPrint('Error loading price history: $e');
       setState(() {
         isLoading = false;
         priceHistory = [];
         macdHistory = [];
-        fallbackSupport = widget.forex.support;
-        fallbackResistance = widget.forex.resistance;
+        fallbackSupport = widget.commodity.support;
+        fallbackResistance = widget.commodity.resistance;
       });
-      // ignore: use_build_context_synchronously
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading data: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading data: $e')),
+        );
+      }
     }
   }
 
@@ -216,7 +213,7 @@ class ForexDetailsPageState extends State<ForexDetailsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.forex.title),
+        title: Text(widget.commodity.title),
         backgroundColor: Colors.white,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.black),
@@ -251,23 +248,23 @@ class ForexDetailsPageState extends State<ForexDetailsPage> {
     return Row(
       children: [
         Icon(
-          Icons.currency_exchange,
+          _getCommodityIcon(widget.commodity.subtitle),
           size: 40,
-          color: Colors.blue,
+          color: Colors.amber,
         ),
         const SizedBox(width: 16),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              widget.forex.title,
+              widget.commodity.title,
               style: const TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
               ),
             ),
             Text(
-              widget.forex.subtitle,
+              widget.commodity.subtitle,
               style: TextStyle(
                 fontSize: 16,
                 color: Colors.grey[600],
@@ -281,10 +278,10 @@ class ForexDetailsPageState extends State<ForexDetailsPage> {
 
   Widget _buildRecommendationCard() {
     Color cardColor;
-    if (widget.forex.recommendation.contains('🟢')) {
+    if (widget.commodity.recommendation.contains('🟢')) {
       // ignore: deprecated_member_use
       cardColor = Colors.green.withOpacity(0.1);
-    } else if (widget.forex.recommendation.contains('🔴')) {
+    } else if (widget.commodity.recommendation.contains('🔴')) {
       // ignore: deprecated_member_use
       cardColor = Colors.red.withOpacity(0.1);
     } else {
@@ -313,11 +310,11 @@ class ForexDetailsPageState extends State<ForexDetailsPage> {
             ),
             const SizedBox(height: 10),
             Text(
-              widget.forex.recommendation,
+              widget.commodity.recommendation,
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
-                color: _getRecommendationColor(widget.forex.recommendation),
+                color: _getRecommendationColor(widget.commodity.recommendation),
               ),
             ),
           ],
@@ -387,8 +384,7 @@ class ForexDetailsPageState extends State<ForexDetailsPage> {
                                 spots: priceHistory
                                     .asMap()
                                     .entries
-                                    .map((e) =>
-                                        FlSpot(e.key.toDouble(), e.value.price))
+                                    .map((e) => FlSpot(e.key.toDouble(), e.value.price))
                                     .toList(),
                                 isCurved: false,
                                 color: Colors.blue,
@@ -428,8 +424,7 @@ class ForexDetailsPageState extends State<ForexDetailsPage> {
                                         color: Colors.green,
                                         fontSize: 12,
                                       ),
-                                      labelResolver: (line) =>
-                                          'Support: ${_formatNumber(line.y)}',
+                                      labelResolver: (line) => 'Support: ${_formatNumber(line.y)}',
                                     ),
                                   ),
                                 if (fallbackResistance > 0)
@@ -445,8 +440,7 @@ class ForexDetailsPageState extends State<ForexDetailsPage> {
                                         color: Colors.red,
                                         fontSize: 12,
                                       ),
-                                      labelResolver: (line) =>
-                                          'Resistance: ${_formatNumber(line.y)}',
+                                      labelResolver: (line) => 'Resistance: ${_formatNumber(line.y)}',
                                     ),
                                   ),
                               ],
@@ -459,8 +453,7 @@ class ForexDetailsPageState extends State<ForexDetailsPage> {
                                             ? fallbackSupport
                                             : double.infinity]
                                       ..removeWhere((e) => e == double.infinity))
-                                    .reduce((a, b) => a < b ? a : b) *
-                                0.95
+                                    .reduce((a, b) => a < b ? a : b) * 0.95
                                 : 0,
                             maxY: priceHistory.isNotEmpty
                                 ? ([priceHistory
@@ -469,10 +462,8 @@ class ForexDetailsPageState extends State<ForexDetailsPage> {
                                         fallbackResistance > 0
                                             ? fallbackResistance
                                             : double.negativeInfinity]
-                                      ..removeWhere(
-                                          (e) => e == double.negativeInfinity))
-                                    .reduce((a, b) => a > b ? a : b) *
-                                1.05
+                                      ..removeWhere((e) => e == double.negativeInfinity))
+                                    .reduce((a, b) => a > b ? a : b) * 1.05
                                 : 0,
                           ),
                         ),
@@ -484,7 +475,6 @@ class ForexDetailsPageState extends State<ForexDetailsPage> {
   }
 
   Widget _buildMACDChart() {
-    // Calculate the latest MACD values and trends
     final latestMACD = macdHistory.isNotEmpty ? macdHistory.last : null;
     final isBullish = latestMACD != null && latestMACD.histogram > 0;
     final isBearish = latestMACD != null && latestMACD.histogram < 0;
@@ -502,7 +492,6 @@ class ForexDetailsPageState extends State<ForexDetailsPage> {
         macdHistory[macdHistory.length - 2].macdLine >
             macdHistory[macdHistory.length - 1].macdLine;
 
-    // Determine MACD interpretation based on chart data
     List<String> macdAnalysis = [];
     if (isCrossOver) {
       if (isBullish) {
@@ -528,7 +517,6 @@ class ForexDetailsPageState extends State<ForexDetailsPage> {
       macdAnalysis.add("Moderate momentum: Histogram shows a small value (${_formatNumber(latestMACD.histogram)}), indicating a non-strong trend.");
     }
 
-    // Calculate min and max for chart scaling
     final minY = macdHistory.isNotEmpty
         ? [
             macdHistory.map((p) => p.macdLine).reduce((a, b) => a < b ? a : b),
@@ -573,7 +561,6 @@ class ForexDetailsPageState extends State<ForexDetailsPage> {
                       ? const Center(child: Text('Failed to load MACD: Insufficient data'))
                       : Stack(
                           children: [
-                            // Histogram (using BarChart with continuous bars)
                             BarChart(
                               BarChartData(
                                 barGroups: macdHistory.asMap().entries.map((entry) {
@@ -590,8 +577,8 @@ class ForexDetailsPageState extends State<ForexDetailsPage> {
                                             ? Colors.green.withOpacity(0.5)
                                             // ignore: deprecated_member_use
                                             : Colors.red.withOpacity(0.5),
-                                        width: 1.0, // Make bars very narrow
-                                        borderRadius: BorderRadius.zero, // No rounded edges
+                                        width: 1.0,
+                                        borderRadius: BorderRadius.zero,
                                       ),
                                     ],
                                   );
@@ -605,7 +592,6 @@ class ForexDetailsPageState extends State<ForexDetailsPage> {
                                 maxY: maxY,
                               ),
                             ),
-                            // MACD and Signal Lines (using LineChart)
                             LineChart(
                               LineChartData(
                                 gridData: const FlGridData(show: true),
@@ -637,7 +623,6 @@ class ForexDetailsPageState extends State<ForexDetailsPage> {
                                 ),
                                 borderData: FlBorderData(show: true),
                                 lineBarsData: [
-                                  // MACD Line (blue)
                                   LineChartBarData(
                                     spots: macdHistory
                                         .map((p) => FlSpot(p.index.toDouble(), p.macdLine))
@@ -647,7 +632,6 @@ class ForexDetailsPageState extends State<ForexDetailsPage> {
                                     barWidth: 2,
                                     dotData: const FlDotData(show: false),
                                   ),
-                                  // Signal Line (yellow)
                                   LineChartBarData(
                                     spots: macdHistory
                                         .map((p) => FlSpot(p.index.toDouble(), p.signalLine))
@@ -676,7 +660,6 @@ class ForexDetailsPageState extends State<ForexDetailsPage> {
                         ),
             ),
             const SizedBox(height: 10),
-            // Legend for the chart
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -688,7 +671,6 @@ class ForexDetailsPageState extends State<ForexDetailsPage> {
               ],
             ),
             const SizedBox(height: 16),
-            // Detailed MACD Analysis
             Text(
               'Detailed MACD Analysis',
               style: TextStyle(
@@ -805,7 +787,7 @@ class ForexDetailsPageState extends State<ForexDetailsPage> {
                   style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                 ),
                 Text(
-                  _formatNumber(widget.forex.currentPrice),
+                  _formatNumber(widget.commodity.currentPrice),
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
               ],
@@ -819,11 +801,11 @@ class ForexDetailsPageState extends State<ForexDetailsPage> {
                   style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                 ),
                 Text(
-                  '${widget.forex.changePercent.toStringAsFixed(2)}%',
+                  '${widget.commodity.changePercent.toStringAsFixed(2)}%',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: widget.forex.changePercent >= 0
+                    color: widget.commodity.changePercent >= 0
                         ? Colors.green
                         : Colors.red,
                   ),
@@ -839,7 +821,7 @@ class ForexDetailsPageState extends State<ForexDetailsPage> {
                   style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                 ),
                 Text(
-                  _formatNumber(widget.forex.sma),
+                  _formatNumber(widget.commodity.sma),
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
               ],
@@ -853,12 +835,40 @@ class ForexDetailsPageState extends State<ForexDetailsPage> {
                   style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                 ),
                 Text(
-                  widget.forex.rsi.toStringAsFixed(2),
+                  widget.commodity.rsi.toStringAsFixed(2),
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: _getRsiColor(widget.forex.rsi),
+                    color: _getRsiColor(widget.commodity.rsi),
                   ),
+                ),
+              ],
+            ),
+            const Divider(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Last Trading Volume',
+                  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                ),
+                Text(
+                  _formatNumber(widget.commodity.lastVolume.toDouble()),
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const Divider(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Average Volume',
+                  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                ),
+                Text(
+                  _formatNumber(widget.commodity.avgVolume.toDouble()),
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -871,8 +881,7 @@ class ForexDetailsPageState extends State<ForexDetailsPage> {
                   style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                 ),
                 Text(
-                  _formatNumber(
-                      fallbackSupport > 0 ? fallbackSupport : widget.forex.support),
+                  _formatNumber(fallbackSupport > 0 ? fallbackSupport : widget.commodity.support),
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
               ],
@@ -886,8 +895,7 @@ class ForexDetailsPageState extends State<ForexDetailsPage> {
                   style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                 ),
                 Text(
-                  _formatNumber(
-                      fallbackResistance > 0 ? fallbackResistance : widget.forex.resistance),
+                  _formatNumber(fallbackResistance > 0 ? fallbackResistance : widget.commodity.resistance),
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
               ],
@@ -899,7 +907,7 @@ class ForexDetailsPageState extends State<ForexDetailsPage> {
   }
 
   Widget _buildConditionsSection() {
-    final conditions = widget.forex.conditions ;
+    final conditions = widget.commodity.conditions;
     if (conditions.isEmpty) return Container();
 
     return Card(
@@ -975,7 +983,7 @@ class ForexDetailsPageState extends State<ForexDetailsPage> {
               ),
             ),
             const SizedBox(height: 10),
-            ...widget.forex.analysis.map((item) => Padding(
+            ...widget.commodity.analysis.map((item) => Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1005,9 +1013,9 @@ class ForexDetailsPageState extends State<ForexDetailsPage> {
   }
 
   Widget _buildTradingStrategySection() {
-    if (widget.forex.entryPrice == null ||
-        widget.forex.stopLoss == null ||
-        widget.forex.takeProfit == null) {
+    if (widget.commodity.entryPrice == null ||
+        widget.commodity.stopLoss == null ||
+        widget.commodity.takeProfit == null) {
       return Container();
     }
 
@@ -1022,7 +1030,7 @@ class ForexDetailsPageState extends State<ForexDetailsPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Suggested Trading Strategy',
+              'Proposed Trading Strategy',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -1038,7 +1046,7 @@ class ForexDetailsPageState extends State<ForexDetailsPage> {
                   style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                 ),
                 Text(
-                  _formatNumber(widget.forex.entryPrice!),
+                  _formatNumber(widget.commodity.entryPrice!),
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -1055,7 +1063,7 @@ class ForexDetailsPageState extends State<ForexDetailsPage> {
                   style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                 ),
                 Text(
-                  _formatNumber(widget.forex.stopLoss!),
+                  _formatNumber(widget.commodity.stopLoss!),
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -1073,7 +1081,7 @@ class ForexDetailsPageState extends State<ForexDetailsPage> {
                   style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                 ),
                 Text(
-                  _formatNumber(widget.forex.takeProfit!),
+                  _formatNumber(widget.commodity.takeProfit!),
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -1101,6 +1109,21 @@ class ForexDetailsPageState extends State<ForexDetailsPage> {
   }
 
   String _formatNumber(double num) {
-    return num.toStringAsFixed(4); // Forex prices typically use 4 decimal places
+    return num.toStringAsFixed(2); // Consistent with StockDetailsPage
+  }
+
+  IconData _getCommodityIcon(String category) {
+    switch (category) {
+      case "Metals":
+        return Icons.diamond;
+      case "Energy":
+        return Icons.local_gas_station;
+      case "Agriculture":
+        return Icons.agriculture;
+      case "Softs":
+        return Icons.local_drink;
+      default:
+        return Icons.shopping_basket;
+    }
   }
 }

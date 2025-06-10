@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:graduationproject/app/Recommendation/CommoditiesRecommendation.dart';
-import 'package:graduationproject/app/Recommendation/CryptoRecommendation.dart';
+import 'package:graduationproject/app/Recommendation/commodities_recommendation.dart';
+import 'package:graduationproject/app/Recommendation/crypto_recommendation.dart';
 import 'package:graduationproject/app/Recommendation/forex_recommendation.dart';
 import 'package:graduationproject/app/Recommendation/stock_detail_page.dart';
-import 'package:graduationproject/widgets/BottomNavBar.dart';
+import 'package:graduationproject/widgets/bottom_navbar.dart';
+
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
@@ -88,10 +89,10 @@ class StockRecommendationPage extends StatefulWidget {
   const StockRecommendationPage({super.key});
 
   @override
-  _StockRecommendationPageState createState() => _StockRecommendationPageState();
+  StockRecommendationPageState createState() => StockRecommendationPageState();
 }
 
-class _StockRecommendationPageState extends State<StockRecommendationPage> with RouteAware {
+class StockRecommendationPageState extends State<StockRecommendationPage> with RouteAware {
   int _selectedIndex = 3;
   int _selectedMarket = 0;
   final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
@@ -180,7 +181,7 @@ class _StockRecommendationPageState extends State<StockRecommendationPage> with 
           tempRecommendations.add(recommendation);
         }
       } catch (e) {
-        print('Error fetching data for ${stock["symbol"]}: $e');
+        debugPrint('Error fetching data for ${stock["symbol"]}: $e');
       }
       await Future.delayed(Duration(milliseconds: 500)); // Avoid rate limiting
     }
@@ -190,7 +191,7 @@ class _StockRecommendationPageState extends State<StockRecommendationPage> with 
     });{
       stockRecommendations = tempRecommendations;
       _loadingStocks = false;
-    };
+    }
   }
 
   Future<Map<String, dynamic>?> _fetchStockDataForSymbol(String symbol) async {
@@ -209,7 +210,9 @@ class _StockRecommendationPageState extends State<StockRecommendationPage> with 
         }
       }
     } catch (e) {
-      print('Error fetching data for $symbol: $e');
+      
+      debugPrint('Error fetching data for $symbol: $e');
+      
     }
     return null;
   }
@@ -679,6 +682,7 @@ class _StockRecommendationPageState extends State<StockRecommendationPage> with 
                     padding: const EdgeInsets.symmetric(horizontal: 6),
                     decoration: BoxDecoration(
                       color: _selectedMarket == index
+                          // ignore: deprecated_member_use
                           ? marketCategories[index].color.withOpacity(0.2)
                           : Colors.grey[200],
                       borderRadius: BorderRadius.circular(12),
@@ -801,6 +805,7 @@ class _StockRecommendationPageState extends State<StockRecommendationPage> with 
                       stock.recommendation,
                       style: TextStyle(color: stock.recommendationColor),
                     ),
+                    // ignore: deprecated_member_use
                     backgroundColor: stock.recommendationColor.withOpacity(0.1),
                   ),
                 ],
@@ -883,6 +888,7 @@ class _StockRecommendationPageState extends State<StockRecommendationPage> with 
 
   Widget _buildSignalChip(String label, int count, Color color) {
     return Chip(
+      // ignore: deprecated_member_use
       backgroundColor: color.withOpacity(0.1),
       label: Text(
         '$label: $count',
@@ -890,6 +896,7 @@ class _StockRecommendationPageState extends State<StockRecommendationPage> with 
       ),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(4),
+        // ignore: deprecated_member_use
         side: BorderSide(color: color.withOpacity(0.3)),
       ),
     );

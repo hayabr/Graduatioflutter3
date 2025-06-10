@@ -23,13 +23,13 @@ class MACDChart extends StatelessWidget {
   final Function(double) formatNumber;
 
   const MACDChart({
-    Key? key,
+    super.key,
     required this.macdHistory,
     required this.isLoading,
     this.title = 'MACD Indicator (6 Months)',
     this.subtitle,
     required this.formatNumber,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -322,9 +322,11 @@ class MACDChart extends StatelessWidget {
                                           toY: e.value.histogram,
                                           color:
                                               e.value.histogram >= 0
+                                                  // ignore: deprecated_member_use
                                                   ? Colors.green.withOpacity(
                                                     0.7,
                                                   )
+                                                  // ignore: deprecated_member_use
                                                   : Colors.red.withOpacity(0.7),
                                           width: 4,
                                           borderRadius:

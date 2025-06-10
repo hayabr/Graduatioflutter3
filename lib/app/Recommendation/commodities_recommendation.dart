@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:graduationproject/app/Recommendation/commodities_recommendation.dart';
 import 'package:graduationproject/app/Recommendation/crypto_recommendation.dart';
-import 'package:graduationproject/app/Recommendation/forex_detail_page.dart';
+import 'package:graduationproject/app/Recommendation/commodity_detail.dart';
+import 'package:graduationproject/app/Recommendation/forex_recommendation.dart';
 import 'package:graduationproject/app/Recommendation/recommendations.dart';
 import 'package:graduationproject/widgets/bottom_navbar.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
-// Adding a class to store MACD points (similar to ForexDetailsPage)
-class ForexMACDPoint {
+// Class to store MACD points for commodities
+class CommodityMACDPoint {
   final int index;
   final double macdLine;
   final double signalLine;
   final double histogram;
 
-  ForexMACDPoint({
+  CommodityMACDPoint({
     required this.index,
     required this.macdLine,
     required this.signalLine,
@@ -22,7 +22,7 @@ class ForexMACDPoint {
   });
 }
 
-class ForexRecommendation {
+class CommodityRecommendation {
   final String symbol;
   final String title;
   final String subtitle;
@@ -45,7 +45,7 @@ class ForexRecommendation {
   final int buySignals;
   final int sellSignals;
 
-  ForexRecommendation({
+  CommodityRecommendation({
     required this.symbol,
     required this.title,
     required this.subtitle,
@@ -84,19 +84,19 @@ class MarketCategory {
   });
 }
 
-class ForexRecommendationPage extends StatefulWidget {
-  const ForexRecommendationPage({super.key});
+class CommoditiesRecommendation extends StatefulWidget {
+  const CommoditiesRecommendation({super.key});
 
   @override
-  ForexRecommendationPageState createState() => ForexRecommendationPageState();
+  CommoditiesRecommendationState createState() => CommoditiesRecommendationState();
 }
 
-class ForexRecommendationPageState extends State<ForexRecommendationPage> with RouteAware {
+class CommoditiesRecommendationState extends State<CommoditiesRecommendation> with RouteAware {
   int _selectedIndex = 3;
-  int _selectedMarket = 2;
+  int _selectedMarket = 1; // Default to Commodities tab
   final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
-  bool _loadingForex = false;
-  List<ForexRecommendation> forexRecommendations = [];
+  bool _loadingCommodities = false;
+  List<CommodityRecommendation> commodityRecommendations = [];
 
   final List<MarketCategory> marketCategories = [
     MarketCategory(
@@ -128,7 +128,7 @@ class ForexRecommendationPageState extends State<ForexRecommendationPage> with R
   @override
   void initState() {
     super.initState();
-    _fetchForexData();
+    _fetchCommodityData();
   }
 
   @override
@@ -146,52 +146,53 @@ class ForexRecommendationPageState extends State<ForexRecommendationPage> with R
   @override
   void didPopNext() {
     setState(() {
-      _selectedMarket = 2;
+      _selectedMarket = 1;
     });
   }
 
-  Future<void> _fetchForexData() async {
+  Future<void> _fetchCommodityData() async {
     setState(() {
-      _loadingForex = true;
+      _loadingCommodities = true;
     });
 
-    final pairs = [
-      {"symbol": "EURUSD=X", "name": "EUR/USD"},
-      {"symbol": "GBPUSD=X", "name": "GBP/USD"},
-      {"symbol": "USDJPY=X", "name": "USD/JPY"},
-      {"symbol": "AUDUSD=X", "name": "AUD/USD"},
-      {"symbol": "USDCAD=X", "name": "USD/CAD"},
-      {"symbol": "USDCHF=X", "name": "USD/CHF"},
-      {"symbol": "NZDUSD=X", "name": "NZD/USD"},
+    final commodities = [
+      {"symbol": "GC=F", "name": "Gold", "category": "Metals"},
+      {"symbol": "SI=F", "name": "Silver", "category": "Metals"},
+      {"symbol": "CL=F", "name": "Crude Oil", "category": "Energy"},
+      {"symbol": "NG=F", "name": "Natural Gas", "category": "Energy"},
+      {"symbol": "PL=F", "name": "Platinum", "category": "Metals"},
+      {"symbol": "HG=F", "name": "Copper", "category": "Metals"},
     ];
-    List<ForexRecommendation> tempRecommendations = [];
 
-    for (var pair in pairs) {
+    List<CommodityRecommendation> tempRecommendations = [];
+
+    for (var commodity in commodities) {
       try {
-        final data = await _fetchForexDataForPair(pair["symbol"]!);
+        final data = await _fetchCommodityDataForSymbol(commodity["symbol"]!);
         if (data != null) {
-          final recommendation = _generateForexRecommendation(
-            pair["symbol"]!,
-            pair["name"]!,
+          final recommendation = _generateCommodityRecommendation(
+            commodity["symbol"]!,
+            commodity["name"]!,
+            commodity["category"]!,
             data,
           );
           tempRecommendations.add(recommendation);
         }
       } catch (e) {
-        debugPrint('Error fetching data for ${pair["symbol"]}: $e');
+        debugPrint('Error fetching data for ${commodity["symbol"]}: $e');
       }
       await Future.delayed(Duration(milliseconds: 500)); // Avoid rate limiting
     }
 
     setState(() {
-      forexRecommendations = tempRecommendations;
-      _loadingForex = false;
+      commodityRecommendations = tempRecommendations;
+      _loadingCommodities = false;
     });
   }
 
-  Future<Map<String, dynamic>?> _fetchForexDataForPair(String pair) async {
+  Future<Map<String, dynamic>?> _fetchCommodityDataForSymbol(String symbol) async {
     final url = Uri.parse(
-        'https://query1.finance.yahoo.com/v8/finance/chart/$pair?interval=1d&range=2mo');
+        'https://query1.finance.yahoo.com/v8/finance/chart/$symbol?interval=1d&range=2mo');
 
     try {
       final response = await http.get(url, headers: {
@@ -204,8 +205,9 @@ class ForexRecommendationPageState extends State<ForexRecommendationPage> with R
           return data;
         }
       }
+      debugPrint('Failed to fetch data for $symbol: ${response.statusCode}');
     } catch (e) {
-      debugPrint('Error fetching data for $pair: $e');
+      debugPrint('Error fetching data for $symbol: $e');
     }
     return null;
   }
@@ -250,8 +252,7 @@ class ForexRecommendationPageState extends State<ForexRecommendationPage> with R
     return rsi;
   }
 
-  // Modified MACD calculation to include full history for charting
-  List<ForexMACDPoint> _calculateMACDHistory(List<double> prices) {
+  List<CommodityMACDPoint> _calculateMACDHistory(List<double> prices) {
     List<double> calculateEMA(List<double> prices, int period) {
       List<double> ema = [];
       if (prices.length < period) return ema;
@@ -275,9 +276,9 @@ class ForexRecommendationPageState extends State<ForexRecommendationPage> with R
 
     List<double> signalLine = calculateEMA(macdLine, 9);
 
-    List<ForexMACDPoint> macdPoints = [];
+    List<CommodityMACDPoint> macdPoints = [];
     for (int i = 0; i < macdLine.length && i < signalLine.length; i++) {
-      macdPoints.add(ForexMACDPoint(
+      macdPoints.add(CommodityMACDPoint(
         index: i,
         macdLine: macdLine[i],
         signalLine: signalLine[i],
@@ -299,10 +300,9 @@ class ForexRecommendationPageState extends State<ForexRecommendationPage> with R
     return tr.isEmpty ? 0 : tr.reduce((a, b) => a + b) / tr.length;
   }
 
-  ForexRecommendation _generateForexRecommendation(
-      String symbol, String name, Map<String, dynamic> data) {
+  CommodityRecommendation _generateCommodityRecommendation(
+      String symbol, String name, String category, Map<String, dynamic> data) {
     final result = data['chart']['result'][0];
-    final meta = result['meta'];
     final quote = result['indicators']['quote'][0];
 
     final closes = _extractList(quote['close']);
@@ -311,10 +311,10 @@ class ForexRecommendationPageState extends State<ForexRecommendationPage> with R
     final lows = _extractList(quote['low']);
 
     if (closes.length < 26 || highs.length < 15 || lows.length < 15) {
-      return ForexRecommendation(
+      return CommodityRecommendation(
         symbol: symbol,
         title: name,
-        subtitle: 'No data available',
+        subtitle: category,
         currentPrice: 0,
         firstPrice: 0,
         sma: 0,
@@ -324,9 +324,9 @@ class ForexRecommendationPageState extends State<ForexRecommendationPage> with R
         support: 0,
         resistance: 0,
         changePercent: 0,
-        recommendation: "⚠️ Insufficient data",
+        recommendation: "⚠️ Insufficient Data",
         recommendationColor: Colors.grey,
-        analysis: ["⚠️ Insufficient data to analyze the pair"],
+        analysis: ["⚠️ Insufficient data for commodity analysis"],
         conditions: [],
         buySignals: 0,
         sellSignals: 0,
@@ -344,7 +344,7 @@ class ForexRecommendationPageState extends State<ForexRecommendationPage> with R
     final rsi = _calculateRSI(closes, 14);
     final percentChange = ((lastClose - firstClose) / firstClose) * 100;
 
-    // Improved support and resistance calculation
+    // Improved support and resistance
     List<double> supports = lows
         .where((low) => lows.where((l) => l <= low * 1.01 && l >= low * 0.99).length >= 3)
         .toList();
@@ -360,10 +360,10 @@ class ForexRecommendationPageState extends State<ForexRecommendationPage> with R
 
     // Calculate ATR for threshold customization
     final atr = _calculateATR(highs, lows, closes);
-    final smaThreshold = atr > 0 ? 0.05 * (atr / lastClose) : 0.005;
-    final percentChangeThreshold = atr > 0 ? 0.05 * (atr / lastClose) * 100 : 0.5;
+    final smaThreshold = atr > 0 ? 0.05 * (atr / lastClose) : 0.05;
+    final percentChangeThreshold = atr > 0 ? 0.05 * (atr / lastClose) * 100 : 5.0;
 
-    // Calculate MACD using full history
+    // Calculate MACD with full history
     final macdHistory = _calculateMACDHistory(closes);
     final latestMACD = macdHistory.isNotEmpty ? macdHistory.last : null;
     final isBullish = latestMACD != null && latestMACD.histogram > 0;
@@ -382,9 +382,9 @@ class ForexRecommendationPageState extends State<ForexRecommendationPage> with R
         macdHistory[macdHistory.length - 2].macdLine >
             macdHistory[macdHistory.length - 1].macdLine;
 
-    // Detailed MACD analysis (similar to ForexDetailsPage)
+    // Detailed MACD analysis
     List<String> macdAnalysis = [];
-    String macdCondition = "Weak Sell - MACD indicates bearish tendency"; // Default value
+    String macdCondition = "Weak Sell - MACD indicates bearish trend"; // Default
     if (isCrossOver) {
       if (isBullish) {
         macdAnalysis.add("Strong bullish crossover: MACD line crossed above signal line with positive histogram (strong buy signal).");
@@ -395,10 +395,10 @@ class ForexRecommendationPageState extends State<ForexRecommendationPage> with R
       }
     } else if (latestMACD != null && latestMACD.macdLine > latestMACD.signalLine) {
       macdAnalysis.add("Bullish trend: MACD line is above signal line, indicating bullish momentum (weak buy signal).");
-      macdCondition = "Weak Buy - MACD indicates bullish tendency";
+      macdCondition = "Weak Buy - MACD indicates bullish trend";
     } else if (latestMACD != null && latestMACD.macdLine < latestMACD.signalLine) {
       macdAnalysis.add("Bearish trend: MACD line is below signal line, indicating bearish momentum (weak sell signal).");
-      macdCondition = "Weak Sell - MACD indicates bearish tendency";
+      macdCondition = "Weak Sell - MACD indicates bearish trend";
     }
 
     if (isTrendingUp) {
@@ -408,9 +408,9 @@ class ForexRecommendationPageState extends State<ForexRecommendationPage> with R
     }
 
     if (latestMACD != null && latestMACD.histogram.abs() > 0.5) {
-      macdAnalysis.add("Strong momentum: Histogram shows a large value (${latestMACD.histogram.toStringAsFixed(4)}), indicating a strong trend.");
+      macdAnalysis.add("Strong momentum: Histogram shows a large value (${latestMACD.histogram.toStringAsFixed(2)}), indicating a strong trend.");
     } else if (latestMACD != null) {
-      macdAnalysis.add("Moderate momentum: Histogram shows a small value (${latestMACD.histogram.toStringAsFixed(4)}), indicating a non-strong trend.");
+      macdAnalysis.add("Moderate momentum: Histogram shows a small value (${latestMACD.histogram.toStringAsFixed(2)}), indicating a non-strong trend.");
     }
 
     // Define the six conditions with updated MACD condition
@@ -428,23 +428,23 @@ class ForexRecommendationPageState extends State<ForexRecommendationPage> with R
       rsi < 30
           ? "Strong Buy - RSI in oversold territory (<30)"
           : rsi < 50
-              ? "Weak Buy - RSI indicates buying tendency"
+              ? "Weak Buy - RSI indicates buying trend"
               : rsi > 70
                   ? "Strong Sell - RSI in overbought territory (>70)"
-                  : "Weak Sell - RSI indicates selling tendency",
+                  : "Weak Sell - RSI indicates selling trend",
 
-      // 3. Trading Volume
+      // 3. Volume
       lastVolume > avgVolume * 1.3 && lastClose > lastSMA
-          ? "Strong Buy - High trading volume with upward movement"
+          ? "Strong Buy - High trading volume with upward trend"
           : lastVolume > avgVolume && lastClose > lastSMA
-              ? "Weak Buy - Slightly high trading volume with upward movement"
+              ? "Weak Buy - Slightly high trading volume with upward trend"
               : lastVolume > avgVolume * 1.3 && lastClose < lastSMA
-                  ? "Strong Sell - High trading volume with downward movement"
+                  ? "Strong Sell - High trading volume with downward trend"
                   : lastVolume > avgVolume && lastClose < lastSMA
-                      ? "Weak Sell - Slightly high trading volume with downward movement"
+                      ? "Weak Sell - Slightly high trading volume with downward trend"
                       : lastClose > lastSMA
-                          ? "Weak Buy - Price rising without strong volume"
-                          : "Weak Sell - Price falling without strong volume",
+                          ? "Weak Buy - Upward price trend without strong volume"
+                          : "Weak Sell - Downward price trend without strong volume",
 
       // 4. Price Change
       percentChange < -percentChangeThreshold
@@ -456,15 +456,15 @@ class ForexRecommendationPageState extends State<ForexRecommendationPage> with R
                   : "Weak Sell - Slight rise",
 
       // 5. Support and Resistance
-      lastClose <= support * 1.002
+      lastClose <= support * 1.02
           ? "Strong Buy - Price is near support level"
           : lastClose < (support + resistance) / 2
               ? "Weak Buy - Price is closer to support"
-              : lastClose >= resistance * 0.998
+              : lastClose >= resistance * 0.98
                   ? "Strong Sell - Price is near resistance level"
                   : "Weak Sell - Price is closer to resistance",
 
-      // 6. MACD (updated based on detailed analysis)
+      // 6. MACD
       macdCondition,
     ];
 
@@ -477,51 +477,49 @@ class ForexRecommendationPageState extends State<ForexRecommendationPage> with R
     Color recommendationColor;
     double? entryPrice, stopLoss, takeProfit;
 
-    // Modified recommendation system
+    // Modified recommendation logic
     if (buySignals > sellSignals) {
       recommendation = "🟢 Buy";
       recommendationColor = Colors.green;
       // Entry price for buy: midpoint between current price and support
       entryPrice = (lastClose + support) / 2;
       if (entryPrice >= lastClose) {
-        entryPrice = lastClose * 0.995; // Ensure entry price is below current price
+        entryPrice = lastClose * 0.995; // Ensure entry price is below current
       }
-      stopLoss = entryPrice * 0.995; // Stop loss 0.5% below
-      takeProfit = entryPrice * 1.015; // Take profit 1.5% above
+      stopLoss = entryPrice * 0.995; // Stop loss 0.5% below entry
+      takeProfit = entryPrice * 1.015; // Take profit 1.5% above entry
     } else if (sellSignals > buySignals) {
       recommendation = "🔴 Sell";
       recommendationColor = Colors.red;
       // Entry price for sell: midpoint between current price and resistance
       entryPrice = (lastClose + resistance) / 2;
       if (entryPrice <= lastClose) {
-        entryPrice = lastClose * 1.005; // Ensure entry price is above current price
+        entryPrice = lastClose * 1.005; // Ensure entry price is above current
       }
-      stopLoss = entryPrice * 1.005; // Stop loss 0.5% above
-      takeProfit = entryPrice * 0.985; // Take profit 1.5% below
+      stopLoss = entryPrice * 1.005; // Stop loss 0.5% above entry
+      takeProfit = entryPrice * 0.985; // Take profit 1.5% below entry
     } else {
-      // If general signals are equal, compare strong signals
+      // If total signals are equal, compare strong signals
       if (strongBuySignals > strongSellSignals) {
         recommendation = "🟢 Buy";
         recommendationColor = Colors.green;
-        // Entry price for buy: midpoint between current price and support
         entryPrice = (lastClose + support) / 2;
         if (entryPrice >= lastClose) {
-          entryPrice = lastClose * 0.995; // Ensure entry price is below current price
+          entryPrice = lastClose * 0.995;
         }
-        stopLoss = entryPrice * 0.995; // Stop loss 0.5% below
-        takeProfit = entryPrice * 1.015; // Take profit 1.5% above
+        stopLoss = entryPrice * 0.995;
+        takeProfit = entryPrice * 1.015;
       } else if (strongSellSignals > strongBuySignals) {
         recommendation = "🔴 Sell";
         recommendationColor = Colors.red;
-        // Entry price for sell: midpoint between current price and resistance
         entryPrice = (lastClose + resistance) / 2;
         if (entryPrice <= lastClose) {
-          entryPrice = lastClose * 1.005; // Ensure entry price is above current price
+          entryPrice = lastClose * 1.005;
         }
-        stopLoss = entryPrice * 1.005; // Stop loss 0.5% above
-        takeProfit = entryPrice * 0.985; // Take profit 1.5% below
+        stopLoss = entryPrice * 1.005;
+        takeProfit = entryPrice * 0.985;
       } else {
-        // If strong signals are equal, choose based on general signals
+        // If strong signals are equal, default based on total signals
         recommendation = buySignals >= sellSignals ? "🟢 Buy" : "🔴 Sell";
         recommendationColor = buySignals >= sellSignals ? Colors.green : Colors.red;
         if (buySignals >= sellSignals) {
@@ -554,44 +552,44 @@ class ForexRecommendationPageState extends State<ForexRecommendationPage> with R
       if (rsi > 70)
         "• RSI in overbought territory (overbought)"
       else if (rsi > 50)
-        "• RSI indicates selling tendency"
+        "• RSI indicates selling trend"
       else if (rsi < 30)
         "• RSI in oversold territory (oversold)"
       else
-        "• RSI indicates buying tendency",
+        "• RSI indicates buying trend",
       if (percentChange > percentChangeThreshold)
-        "• Strong bullish trend (↑ ${percentChange.toStringAsFixed(2)}%)"
+        "• Strong upward trend (↑ ${percentChange.toStringAsFixed(2)}%)"
       else if (percentChange > 0)
-        "• Slight bullish trend (↑ ${percentChange.toStringAsFixed(2)}%)"
+        "• Slight upward trend (↑ ${percentChange.toStringAsFixed(2)}%)"
       else if (percentChange < -percentChangeThreshold)
-        "• Strong bearish trend (↓ ${percentChange.abs().toStringAsFixed(2)}%)"
+        "• Strong downward trend (↓ ${percentChange.abs().toStringAsFixed(2)}%)"
       else
-        "• Slight bearish trend (↓ ${percentChange.abs().toStringAsFixed(2)}%)",
+        "• Slight downward trend (↓ ${percentChange.abs().toStringAsFixed(2)}%)",
       if (lastVolume > avgVolume * 1.3)
-        "• Trading volume 30% above average (significant activity)"
+        "• Trading volume is 30% above average (significant activity)"
       else if (lastVolume < avgVolume * 0.7)
-        "• Trading volume 30% below average (weak activity)"
+        "• Trading volume is 30% below average (weak activity)"
       else
-        "• Trading volume close to average",
-      if (lastClose <= support * 1.002)
+        "• Trading volume is close to average",
+      if (lastClose <= support * 1.02)
         "• Price is near support level (strong buy signal)"
       else if (lastClose < (support + resistance) / 2)
         "• Price is closer to support (weak buy signal)"
-      else if (lastClose >= resistance * 0.998)
+      else if (lastClose >= resistance * 0.98)
         "• Price is near resistance level (strong sell signal)"
       else
         "• Price is closer to resistance (weak sell signal)",
-      // Adding detailed MACD analysis
+      // Add detailed MACD analysis
       ...macdAnalysis,
-      "• Current support level: ${support.toStringAsFixed(4)}",
-      "• Current resistance level: ${resistance.toStringAsFixed(4)}",
-      "• Average True Range (ATR): ${atr.toStringAsFixed(4)}",
+      "• Current support level: ${support.toStringAsFixed(2)} USD",
+      "• Current resistance level: ${resistance.toStringAsFixed(2)} USD",
+      "• Average True Range (ATR): ${atr.toStringAsFixed(2)} USD",
     ];
 
-    return ForexRecommendation(
+    return CommodityRecommendation(
       symbol: symbol,
       title: name,
-      subtitle: meta['exchangeName'] ?? 'Forex',
+      subtitle: category,
       currentPrice: lastClose,
       firstPrice: firstClose,
       sma: lastSMA,
@@ -618,14 +616,14 @@ class ForexRecommendationPageState extends State<ForexRecommendationPage> with R
       _selectedMarket = index;
     });
 
-    if (index != 2) {
+    if (index != 1) {
       final route = MaterialPageRoute(
         builder: (context) {
           switch (index) {
             case 0:
               return const StockRecommendationPage();
-            case 1:
-              return const CommoditiesRecommendation();
+            case 2:
+              return const ForexRecommendationPage();
             case 3:
               return const CryptoRecommendationPage();
             default:
@@ -652,13 +650,13 @@ class ForexRecommendationPageState extends State<ForexRecommendationPage> with R
         backgroundColor: Colors.white,
         elevation: 0,
         title: const Text(
-          'Forex Recommendations',
+          'Commodities Recommendations',
           style: TextStyle(color: Colors.black, fontSize: 20),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.green),
-            onPressed: _fetchForexData,
+            icon: const Icon(Icons.refresh, color: Colors.amber),
+            onPressed: _fetchCommodityData,
           ),
         ],
       ),
@@ -723,17 +721,16 @@ class ForexRecommendationPageState extends State<ForexRecommendationPage> with R
           ),
           const Divider(),
           Expanded(
-            child: _loadingForex
+            child: _loadingCommodities
                 ? const Center(child: CircularProgressIndicator())
-                : forexRecommendations.isEmpty
-                    ? const Center(
-                        child: Text('Failed to fetch data. Check connection and try again.'))
+                : commodityRecommendations.isEmpty
+                    ? const Center(child: Text('Failed to fetch data. Check connection and try again.'))
                     : ListView.builder(
-                        itemCount: forexRecommendations.length,
+                        itemCount: commodityRecommendations.length,
                         itemBuilder: (context, index) {
-                          final recommendation = forexRecommendations[index];
+                          final recommendation = commodityRecommendations[index];
                           return _buildRecommendationCard(
-                            forex: recommendation,
+                            commodity: recommendation,
                           );
                         },
                       ),
@@ -748,7 +745,7 @@ class ForexRecommendationPageState extends State<ForexRecommendationPage> with R
   }
 
   Widget _buildRecommendationCard({
-    required ForexRecommendation forex,
+    required CommodityRecommendation commodity,
   }) {
     return Card(
       margin: const EdgeInsets.all(8),
@@ -757,7 +754,7 @@ class ForexRecommendationPageState extends State<ForexRecommendationPage> with R
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => ForexDetailsPage(forex: forex),
+              builder: (context) => CommodityDetailsPage(commodity: commodity),
             ),
           );
         },
@@ -769,10 +766,10 @@ class ForexRecommendationPageState extends State<ForexRecommendationPage> with R
               Row(
                 children: [
                   Icon(
-                    forex.recommendation.contains('Buy')
+                    commodity.recommendation.contains('Buy')
                         ? Icons.trending_up
                         : Icons.trending_down,
-                    color: forex.recommendationColor,
+                    color: commodity.recommendationColor,
                     size: 30,
                   ),
                   const SizedBox(width: 10),
@@ -781,14 +778,14 @@ class ForexRecommendationPageState extends State<ForexRecommendationPage> with R
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          forex.title,
+                          commodity.title,
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
                           ),
                         ),
                         Text(
-                          forex.subtitle,
+                          commodity.subtitle,
                           style: TextStyle(
                             color: Colors.grey[600],
                             fontSize: 14,
@@ -799,11 +796,11 @@ class ForexRecommendationPageState extends State<ForexRecommendationPage> with R
                   ),
                   Chip(
                     label: Text(
-                      forex.recommendation,
-                      style: TextStyle(color: forex.recommendationColor),
+                      commodity.recommendation,
+                      style: TextStyle(color: commodity.recommendationColor),
                     ),
                     // ignore: deprecated_member_use
-                    backgroundColor: forex.recommendationColor.withOpacity(0.1),
+                    backgroundColor: commodity.recommendationColor.withOpacity(0.1),
                   ),
                 ],
               ),
@@ -812,13 +809,13 @@ class ForexRecommendationPageState extends State<ForexRecommendationPage> with R
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Price: ${forex.currentPrice.toStringAsFixed(4)}',
+                    'Price: \$${commodity.currentPrice.toStringAsFixed(2)}',
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   Text(
-                    'Change: ${forex.changePercent.toStringAsFixed(2)}%',
+                    'Change: ${commodity.changePercent.toStringAsFixed(2)}%',
                     style: TextStyle(
-                      color: forex.changePercent >= 0 ? Colors.green : Colors.red,
+                      color: commodity.changePercent >= 0 ? Colors.green : Colors.red,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -828,16 +825,16 @@ class ForexRecommendationPageState extends State<ForexRecommendationPage> with R
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Average: ${forex.sma.toStringAsFixed(4)}'),
-                  Text('RSI: ${forex.rsi.toStringAsFixed(1)}'),
+                  Text('Average: \$${commodity.sma.toStringAsFixed(2)}'),
+                  Text('RSI: ${commodity.rsi.toStringAsFixed(1)}'),
                 ],
               ),
               const SizedBox(height: 8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _buildSignalChip('Buy Signals', forex.buySignals, Colors.green),
-                  _buildSignalChip('Sell Signals', forex.sellSignals, Colors.red),
+                  _buildSignalChip('Buy Signals', commodity.buySignals, Colors.green),
+                  _buildSignalChip('Sell Signals', commodity.sellSignals, Colors.red),
                 ],
               ),
               const SizedBox(height: 8),
@@ -846,7 +843,7 @@ class ForexRecommendationPageState extends State<ForexRecommendationPage> with R
                 style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[700]),
               ),
               Column(
-                children: forex.conditions
+                children: commodity.conditions
                     .map((condition) => Padding(
                           padding: const EdgeInsets.symmetric(vertical: 2),
                           child: Row(

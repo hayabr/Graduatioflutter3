@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:graduationproject/app/Recommendation/recommendations.dart';
+import 'package:graduationproject/app/Recommendation/widgets/fake_simulation.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
@@ -31,6 +32,7 @@ class StockDetailsPage extends StatefulWidget {
   const StockDetailsPage({super.key, required this.stock});
 
   @override
+  // ignore: library_private_types_in_public_api
   _StockDetailsPageState createState() => _StockDetailsPageState();
 }
 
@@ -87,7 +89,7 @@ class _StockDetailsPageState extends State<StockDetailsPage> {
         }
 
         if (validCloses.length < 26) {
-          print('Not enough data for MACD: ${validCloses.length} points');
+          debugPrint('Not enough data for MACD: ${validCloses.length} points');
           List<double> supports = validLows
               .where((low) => validLows.where((l) => l <= low * 1.01 && l >= low * 0.99).length >= 3)
               .toList();
@@ -106,11 +108,13 @@ class _StockDetailsPageState extends State<StockDetailsPage> {
                   ? validHighs.reduce((a, b) => a > b ? a : b)
                   : widget.stock.resistance;
 
-          setState(() {
-            priceHistory = points;
-            macdHistory = [];
-            isLoading = false;
-          });
+          if (mounted) {
+            setState(() {
+              priceHistory = points;
+              macdHistory = [];
+              isLoading = false;
+            });
+          }
           return;
         }
 
@@ -141,27 +145,29 @@ class _StockDetailsPageState extends State<StockDetailsPage> {
             ? resistances.reduce((a, b) => a > b ? a : b)
             : validHighs.reduce((a, b) => a > b ? a : b);
 
-        setState(() {
-          priceHistory = points;
-          macdHistory = macdPoints;
-          isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            priceHistory = points;
+            macdHistory = macdPoints;
+            isLoading = false;
+          });
+        }
       } else {
-        print('Failed to fetch price history: ${response.statusCode}');
         throw Exception('Failed to load price history');
       }
     } catch (e) {
-      print('Error loading price history: $e');
-      setState(() {
-        isLoading = false;
-        priceHistory = [];
-        macdHistory = [];
-        fallbackSupport = widget.stock.support;
-        fallbackResistance = widget.stock.resistance;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading data: $e')),
-      );
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+          priceHistory = [];
+          macdHistory = [];
+          fallbackSupport = widget.stock.support;
+          fallbackResistance = widget.stock.resistance;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading data: $e')),
+        );
+      }
     }
   }
 
@@ -262,7 +268,7 @@ class _StockDetailsPageState extends State<StockDetailsPage> {
               ),
             ),
             Text(
-              widget.stock.subtitle ?? 'Stock',
+              widget.stock.subtitle,
               style: TextStyle(
                 fontSize: 16,
                 color: Colors.grey[600],
@@ -277,10 +283,13 @@ class _StockDetailsPageState extends State<StockDetailsPage> {
   Widget _buildRecommendationCard() {
     Color cardColor;
     if (widget.stock.recommendation.contains('🟢')) {
+      // ignore: deprecated_member_use
       cardColor = Colors.green.withOpacity(0.1);
     } else if (widget.stock.recommendation.contains('🔴')) {
+      // ignore: deprecated_member_use
       cardColor = Colors.red.withOpacity(0.1);
     } else {
+      // ignore: deprecated_member_use
       cardColor = Colors.blue.withOpacity(0.1);
     }
 
@@ -304,13 +313,43 @@ class _StockDetailsPageState extends State<StockDetailsPage> {
               ),
             ),
             const SizedBox(height: 10),
-            Text(
-              widget.stock.recommendation,
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: _getRecommendationColor(widget.stock.recommendation),
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    widget.stock.recommendation,
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: _getRecommendationColor(widget.stock.recommendation),
+                    ),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => FakeSimulationPage(
+                          stock: widget.stock,
+                          userId: '12',
+                        ),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text(
+                    'Simulation',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -568,7 +607,9 @@ class _StockDetailsPageState extends State<StockDetailsPage> {
                                         toY: point.histogram,
                                         fromY: 0,
                                         color: point.histogram > 0
+                                            // ignore: deprecated_member_use
                                             ? Colors.green.withOpacity(0.5)
+                                            // ignore: deprecated_member_use
                                             : Colors.red.withOpacity(0.5),
                                         width: 1.0,
                                         borderRadius: BorderRadius.zero,
@@ -874,7 +915,7 @@ class _StockDetailsPageState extends State<StockDetailsPage> {
   }
 
   Widget _buildConditionsSection() {
-    final conditions = widget.stock.conditions ?? [];
+    final conditions = widget.stock.conditions;
     if (conditions.isEmpty) return Container();
 
     return Card(
@@ -986,6 +1027,29 @@ class _StockDetailsPageState extends State<StockDetailsPage> {
       return Container();
     }
 
+    // تحديد نوع الصفقة بناءً على التوصية
+    bool isBuySignal = widget.stock.recommendation.contains('🟢');
+    bool isSellSignal = widget.stock.recommendation.contains('🔴');
+
+    // التحقق من الأسعار
+    double entryPrice = widget.stock.entryPrice!;
+    double currentPrice = widget.stock.currentPrice;
+    double stopLoss = widget.stock.stopLoss!;
+    double takeProfit = widget.stock.takeProfit!;
+
+    // تعديل الأسعار بناءً على نوع الصفقة
+    if (isBuySignal) {
+      // صفقة شراء: وقف الخسارة أقل من سعر الدخول والسعر الحالي
+      // جني الأرباح أعلى من سعر الدخول والسعر الحالي
+      stopLoss = (entryPrice < currentPrice ? entryPrice : currentPrice) * 0.98; // 2% أقل من الأدنى
+      takeProfit = (entryPrice > currentPrice ? entryPrice : currentPrice) * 1.03; // 3% أعلى من الأعلى
+    } else if (isSellSignal) {
+      // صفقة بيع: وقف الخسارة أعلى من سعر الدخول والسعر الحالي
+      // جني الأرباح أقل من سعر الدخول والسعر الحالي
+      stopLoss = (entryPrice > currentPrice ? entryPrice : currentPrice) * 1.02; // 2% أعلى من الأعلى
+      takeProfit = (entryPrice < currentPrice ? entryPrice : currentPrice) * 0.97; // 3% أقل من الأدنى
+    }
+
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(
@@ -1013,7 +1077,7 @@ class _StockDetailsPageState extends State<StockDetailsPage> {
                   style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                 ),
                 Text(
-                  _formatNumber(widget.stock.entryPrice!),
+                  _formatNumber(entryPrice),
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -1030,7 +1094,7 @@ class _StockDetailsPageState extends State<StockDetailsPage> {
                   style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                 ),
                 Text(
-                  _formatNumber(widget.stock.stopLoss!),
+                  _formatNumber(stopLoss),
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -1048,7 +1112,7 @@ class _StockDetailsPageState extends State<StockDetailsPage> {
                   style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                 ),
                 Text(
-                  _formatNumber(widget.stock.takeProfit!),
+                  _formatNumber(takeProfit),
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
